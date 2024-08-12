@@ -12,6 +12,4 @@ RUN poetry config virtualenvs.create false
 
 RUN poetry install -n
 
-COPY app/app /app/
-
-RUN /bin/sh scripts/prestart.sh
+COPY . .
