@@ -2,9 +2,9 @@ import contextlib
 
 from fastapi_users.exceptions import UserAlreadyExists
 
-from app.db import get_async_session, get_user_db
+from app.db import get_async_session
 from app.schemas import UserCreate
-from app.users import get_user_manager
+from app.users import get_user_manager, get_user_db
 
 get_async_session_context = contextlib.asynccontextmanager(get_async_session)
 get_user_db_context = contextlib.asynccontextmanager(get_user_db)

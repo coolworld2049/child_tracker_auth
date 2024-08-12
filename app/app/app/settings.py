@@ -3,7 +3,7 @@ import pathlib
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
-env_path = pathlib.Path(__file__).parent.parent.parent.joinpath(".env")
+env_path = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(".env")
 
 load_dotenv(env_path)
 
@@ -12,13 +12,13 @@ class Settings(BaseSettings):
     HOST: str = "localhost"
     PORT: int = 8000
 
-    DB_HOST: str
-    DB_PORT: int
-    DB_ROOT_USER: str
-    DB_ROOT_PASSWORD: str
-    DB_USERNAME: str
-    DB_PASSWORD: str
-    DB_DATABASE: str
+    MARIADB_HOST: str
+    MARIADB_PORT: int
+    MARIADB_ROOT_USER: str
+    MARIADB_ROOT_PASSWORD: str
+    MARIADB_USER: str
+    MARIADB_PASSWORD: str
+    MARIADB_DATABASE: str
 
     MAIL_DRIVER: str
     MAIL_HOST: str
@@ -34,8 +34,12 @@ class Settings(BaseSettings):
     IS_DEBUG: bool = False
 
     @property
-    def db_url(self):
-        return f"mysql+aiomysql://{self.DB_ROOT_USER}:{self.DB_ROOT_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_DATABASE}"
+    def async_database_url(self):
+        return f"mysql+aiomysql://{self.MARIADB_ROOT_USER}:{self.MARIADB_ROOT_PASSWORD}@{self.MARIADB_HOST}:{self.MARIADB_PORT}/{self.MARIADB_DATABASE}"
+
+    @property
+    def sync_database_url(self):
+        return self.async_database_url.replace("+aiomysql", "+pymysql")
 
 
 settings = Settings()
