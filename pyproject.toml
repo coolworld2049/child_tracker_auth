@@ -8,10 +8,18 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.112.0"
-fastapi-users = {extras = ["sqlalchemy"], version = "^13.0.0"}
+fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^13.0.0"}
 alembic = "^1.13.2"
-uvicorn = "^0.30.5"
-databases = {extras = ["aiomysql"], version = "^0.9.0"}
+uvicorn = {extras = ["standard"], version = "^0.30.5"}
+pydantic = "^2.8.2"
+pydantic-settings = "^2.4.0"
+aiosqlite = "^0.20.0"
+aiomysql = "^0.2.0"
+mysqlclient = "^2.2.4"
+sqlalchemy = "^2.0.32"
+python-dotenv = "^1.0.1"
+loguru = "^0.7.2"
+fastapi-mail = "^1.4.1"
 
 [tool.poetry.dev-dependencies]
 
