@@ -12,6 +12,7 @@ load_dotenv(env_path)
 class Settings(BaseSettings):
     HOST: str = "localhost"
     PORT: int = 8000
+    DOMAIN: str | None = None
 
     MARIADB_HOST: str
     MARIADB_PORT: int
@@ -55,10 +56,18 @@ class Settings(BaseSettings):
             MAIL_FROM_NAME=self.MAIL_FROM_NAME,
             MAIL_PORT=self.MAIL_PORT,
             MAIL_SERVER=self.MAIL_HOST,
-            MAIL_STARTTLS=True,
+            MAIL_STARTTLS=False,
             MAIL_SSL_TLS=False,
         )
         return conf
+
+    @property
+    def https_domain(self):
+        return (
+            f"https://{self.DOMAIN}"
+            if self.DOMAIN
+            else f"https://{self.HOST}:${self.PORT}"
+        )
 
 
 settings = Settings()

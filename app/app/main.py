@@ -25,7 +25,7 @@ async def lifespan(app):
 
 
 def get_application() -> FastAPI:
-    application = FastAPI(title="child_tracker_auth")
+    application = FastAPI(title="child_tracker_auth", lifespan=lifespan)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,

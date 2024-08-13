@@ -1,6 +1,7 @@
 import contextlib
 
 from fastapi_users.exceptions import UserAlreadyExists
+from loguru import logger
 
 from app.schemas import UserCreate
 from .database import get_user_db
@@ -19,9 +20,13 @@ async def create_user(email: str, password: str, is_superuser: bool = False):
                 async with get_user_manager_context(user_db) as user_manager:
                     user = await user_manager.create(
                         UserCreate(
-                            email=email, password=password, is_superuser=is_superuser
+                            email=email,
+                            password=password,
+                            is_superuser=is_superuser,
+                            is_verified=True,
+                            is_active=True,
                         )
                     )
-                    print(f"User created {user}")
+                    logger.warning(f"User created {user}")
     except UserAlreadyExists:
-        print(f"User {email} already exists")
+        logger.warning(f"User {email} already exists")

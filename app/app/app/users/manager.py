@@ -19,7 +19,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         logger.debug(f"User {user.id} has registered.")
-        await self.send_registration_email(user)
+        if not user.is_verified:
+            await self.send_registration_email(user)
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -46,13 +47,16 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 
     async def send_reset_password_email(self, user: User, token: str):
         subject = "Password Reset Request"
-        reset_url = f"https://yourapp.com/reset-password?token={token}"
-        body = f"Hello {user.email}, to reset your password, please visit the following link: {reset_url}"
+        reset_url = f"{settings.https_domain}/reset-password?token={token}"
+        body = (
+            f"Hello {user.email}, to reset your password, please visit the following link: {reset_url}. "
+            f"Your verfication token: {token}"
+        )
         await EmailManager.send_email(user.email, subject, body)
 
     async def send_verification_email(self, user: User, token: str):
         subject = "Verify your email address"
-        verify_url = f"https://yourapp.com/verify-email?token={token}"
+        verify_url = f"{settings.https_domain}/verify-email?token={token}"
         body = f"Hello {user.email}, please verify your email address by clicking the following link: {verify_url}"
         await EmailManager.send_email(user.email, subject, body)
 
