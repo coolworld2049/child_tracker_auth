@@ -1,32 +1,16 @@
 import uuid
-from typing import Optional
+from typing import Optional, AsyncGenerator
 
-from fastapi import Depends, Request
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
-from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
-from fastapi_users.authentication import (
-    AuthenticationBackend,
-    BearerTransport,
-    JWTStrategy,
-)
+from fastapi import Request, Depends
+from fastapi_users import BaseUserManager, UUIDIDMixin, FastAPIUsers
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from loguru import logger
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_async_session
-from app.models import User, OAuthAccount
+from app.auth.backend import auth_backend
+from app.email.manager import EmailManager
+from app.models import User
 from app.settings import settings
-
-conf = ConnectionConfig(
-    MAIL_USERNAME=settings.MAIL_USERNAME,
-    MAIL_PASSWORD=settings.MAIL_PASSWORD,
-    MAIL_FROM=settings.MAIL_USERNAME,
-    MAIL_FROM_NAME=settings.MAIL_FROM_NAME,
-    MAIL_PORT=settings.MAIL_PORT,
-    MAIL_SERVER=settings.MAIL_HOST,
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-)
+from app.users.database import get_user_db
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -58,55 +42,26 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         body = (
             f"Hello {user.email}, welcome to our platform! Thank you for registering."
         )
-
-        await self.send_email(user.email, subject, body)
+        await EmailManager.send_email(user.email, subject, body)
 
     async def send_reset_password_email(self, user: User, token: str):
         subject = "Password Reset Request"
         reset_url = f"https://yourapp.com/reset-password?token={token}"
         body = f"Hello {user.email}, to reset your password, please visit the following link: {reset_url}"
-
-        await self.send_email(user.email, subject, body)
+        await EmailManager.send_email(user.email, subject, body)
 
     async def send_verification_email(self, user: User, token: str):
         subject = "Verify your email address"
         verify_url = f"https://yourapp.com/verify-email?token={token}"
         body = f"Hello {user.email}, please verify your email address by clicking the following link: {verify_url}"
-
-        await self.send_email(user.email, subject, body)
-
-    @staticmethod
-    async def send_email(to_email: str, subject: str, body: str):
-        message = MessageSchema(
-            subject=subject, recipients=[to_email], body=body, subtype="plain"
-        )
-
-        fm = FastMail(conf)
-        await fm.send_message(message)
-        logger.debug(f"Email sent to {to_email}: {subject}")
+        await EmailManager.send_email(user.email, subject, body)
 
 
-def get_jwt_strategy() -> JWTStrategy:
-    return JWTStrategy(secret=settings.SECRET_KEY, lifetime_seconds=3600)
-
-
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
-
-auth_backend = AuthenticationBackend(
-    name="jwt",
-    transport=bearer_transport,
-    get_strategy=get_jwt_strategy,
-)
-
-
-async def get_user_db(session: AsyncSession = Depends(get_async_session)):
-    yield SQLAlchemyUserDatabase(session, User, OAuthAccount)
-
-
-async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
+async def get_user_manager(
+    user_db: SQLAlchemyUserDatabase = Depends(get_user_db),
+) -> AsyncGenerator:
     yield UserManager(user_db)
 
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
-
 current_active_user = fastapi_users.current_user(active=True)

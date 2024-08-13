@@ -1,6 +1,7 @@
 import pathlib
 
 from dotenv import load_dotenv
+from fastapi_mail import ConnectionConfig
 from pydantic_settings import BaseSettings
 
 env_path = pathlib.Path(__file__).parent.parent.parent.parent.joinpath(".env")
@@ -31,7 +32,11 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str
 
     SECRET_KEY: str
+    CORS_ORIGINS: list[str] = ["*"]
+    JWT_LIFETIME: int = 3600
+
     IS_DEBUG: bool = False
+    LOG_LEVEL: str = "INFO"
 
     @property
     def async_database_url(self):
@@ -40,6 +45,20 @@ class Settings(BaseSettings):
     @property
     def sync_database_url(self):
         return self.async_database_url.replace("+aiomysql", "+pymysql")
+
+    @property
+    def email_conf(self):
+        conf = ConnectionConfig(
+            MAIL_USERNAME=self.MAIL_USERNAME,
+            MAIL_PASSWORD=self.MAIL_PASSWORD,
+            MAIL_FROM=self.MAIL_USERNAME,
+            MAIL_FROM_NAME=self.MAIL_FROM_NAME,
+            MAIL_PORT=self.MAIL_PORT,
+            MAIL_SERVER=self.MAIL_HOST,
+            MAIL_STARTTLS=True,
+            MAIL_SSL_TLS=False,
+        )
+        return conf
 
 
 settings = Settings()
