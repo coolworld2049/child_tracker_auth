@@ -33,7 +33,7 @@ async def _engine() -> AsyncGenerator[AsyncEngine, None]:
 
     :yield: new engine.
     """
-    from child_tracker_auth.db.meta import meta
+    from child_tracker_auth.db.base import meta
     from child_tracker_auth.db.models import load_all_models
 
     load_all_models()

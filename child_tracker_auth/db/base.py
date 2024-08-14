@@ -1,9 +1,17 @@
-from sqlalchemy.orm import DeclarativeBase
+import sqlalchemy as sa
+from sqlalchemy import create_engine
+from sqlalchemy.ext.automap import automap_base
 
-from child_tracker_auth.db.meta import meta
+from child_tracker_auth.settings import settings
 
+meta = sa.MetaData()
+meta.reflect(
+    create_engine(
+        str(settings.db_url).replace("aiomysql", "pymysql"), echo=settings.db_echo
+    ),
+    only={"members"},
+)
+Base = automap_base(metadata=meta)
+Base.prepare()
 
-class Base(DeclarativeBase):
-    """Base for all models."""
-
-    metadata = meta
+MemberTable = Base.classes.members

@@ -41,10 +41,23 @@ class Settings(BaseSettings):
     # Variables for the database
     db_host: str = "localhost"
     db_port: int = 3306
-    db_user: str = "child_tracker_auth"
-    db_pass: str = "child_tracker_auth"
-    db_base: str = "child_tracker_auth"
+    db_user: str
+    db_pass: str
+    db_base: str
     db_echo: bool = False
+
+    secret_key: str
+    algorithm: str
+    access_token_expire_minutes: int
+
+    mail_username: str
+    mail_password: str
+    mail_from: str
+    mail_port: int
+    mail_server: str
+
+    project_name: str
+    frontend_url: str
 
     @property
     def db_url(self) -> URL:
@@ -63,7 +76,7 @@ class Settings(BaseSettings):
         )
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="../.env",
         env_prefix="CHILD_TRACKER_AUTH_",
         env_file_encoding="utf-8",
     )

@@ -4,8 +4,6 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from child_tracker_auth.db.meta import meta
-from child_tracker_auth.db.models import load_all_models
 from child_tracker_auth.settings import settings
 
 
@@ -30,11 +28,11 @@ def _setup_db(app: FastAPI) -> None:  # pragma: no cover
 
 async def _create_tables() -> None:  # pragma: no cover
     """Populates tables in the database."""
-    load_all_models()
-    engine = create_async_engine(str(settings.db_url))
-    async with engine.begin() as connection:
-        await connection.run_sync(meta.create_all)
-    await engine.dispose()
+    pass
+    # engine = create_async_engine(str(settings.db_url))
+    # async with engine.begin() as connection:
+    #     await connection.run_sync(meta.create_all)
+    # await engine.dispose()
 
 
 @asynccontextmanager
