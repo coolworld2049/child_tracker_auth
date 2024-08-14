@@ -14,7 +14,7 @@ config = ConnectionConfig(
     MAIL_PORT=settings.mail_port,
     MAIL_SERVER=settings.mail_server,
     MAIL_SSL_TLS=False,
-    MAIL_STARTTLS=True,
+    MAIL_STARTTLS=False,
     TEMPLATE_FOLDER=Path(__file__).parent.parent / "templates/",
 )
 
@@ -28,11 +28,13 @@ async def send_email_async(subject: str, email_to: EmailStr, body: dict, templat
         template_body=body,
         subtype="html",
     )
-
+    logger.info(f"Start sending email '{subject}' to {email_to}")
     fm = FastMail(config)
     try:
         await fm.send_message(message, template_name=template)
+        logger.info(f"An email '{subject}' to {email_to} has been sent.")
         return True
     except ConnectionErrors as e:
         logger.error(e)
+        logger.info(f"An email '{subject}' to {email_to} not sent.")
         return False

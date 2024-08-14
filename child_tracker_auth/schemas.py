@@ -1,34 +1,27 @@
-from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
+
+from db.base import MemberTable
+from utils.sa_to_pydantic import sqlalchemy_to_pydantic
+
+PydanticMember = sqlalchemy_to_pydantic(
+    MemberTable, exclude=["password_pbkdf_hash", "password"]
+)
 
 
-class UserBase(BaseModel):
+class PydanticMemberCreate(BaseModel):
     email: EmailStr
     password: str
-    is_verified: bool = False
-
-
-class UserCreate(UserBase):
-    pass
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class UserResponse(BaseModel):
-    id: int
-    email: EmailStr
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+    name: str
+    role: Literal["member", "admin", "editor", "manager"] = "member"
+    active: int = Field(0, ge=0, le=1)
 
 
 class RegistrationUserRepsonse(BaseModel):
     message: str
-    data: UserResponse
+    data: PydanticMember
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class EmailSchema(BaseModel):

@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from fastapi import Depends, HTTPException, status
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from starlette.requests import Request
 
 import schemas
@@ -21,62 +22,73 @@ router = APIRouter()
 )
 async def register(
     request: Request,
-    user_credentials: schemas.UserCreate,
-    db: Session = Depends(get_db_session),
+    user_credentials: schemas.PydanticMemberCreate,
+    db: AsyncSession = Depends(get_db_session),
+    *,
+    background_tasks: BackgroundTasks,
 ):
-    email_check = (
-        db.query(MemberTable)
-        .filter(MemberTable.email == user_credentials.email)
-        .first()
+    # Check if email already exists
+    email_check_query = select(MemberTable).filter(
+        MemberTable.email == user_credentials.email
     )
+    email_check_result = await db.execute(email_check_query)
+    email_check = email_check_result.scalars().first()
+
     if email_check is not None:
         raise HTTPException(
             detail="Email is already registered", status_code=status.HTTP_409_CONFLICT
         )
 
-    # hash the password
-
+    # Hash the password
     hashed_password = database_utils.get_password_hashed(user_credentials.password)
     user_credentials.password = hashed_password
 
     new_user = MemberTable(
-        email=user_credentials.email, password=user_credentials.password
+        email=user_credentials.email,
+        name=user_credentials.name,
+        role=user_credentials.role,
+        active=user_credentials.active,
+        password="",
+        password_pbkdf_hash=user_credentials.password,
     )
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    await db.commit()
+    await db.refresh(new_user)
 
-    token = token_utils.token(user_credentials.email)
-    # print(token)
-    email_verification_endpoint = f"{settings.frontend_url}auth/confirm-email/{token}/"
-    mail_body = {
-        "email": user_credentials.email,
-        "project_name": settings.project_name,
-        "url": email_verification_endpoint,
-    }
+    if not user_credentials.active:
+        token = token_utils.token(user_credentials.email)
+        email_verification_endpoint = f"{settings.frontend_url}/confirm-email/{token}/"
+        mail_body = {
+            "email": user_credentials.email,
+            "project_name": settings.project_name,
+            "url": email_verification_endpoint,
+        }
 
-    mail_status = await mailer_utils.send_email_async(
-        subject="Email Verification: Registration Confirmation",
-        email_to=user_credentials.email,
-        body=mail_body,
-        template="email_verification.html",
+        background_tasks.add_task(mailer_utils.send_email_async, **dict(
+            subject="Email Verification: Registration Confirmation",
+            email_to=user_credentials.email,
+            body=mail_body,
+            template="email_verification.html", ))
+
+    new_user_response = schemas.RegistrationUserRepsonse(
+        message="User registration successful",
+        data=schemas.PydanticMember(**new_user.__dict__),
     )
-
-    return {"message": "User registration successful", "data": new_user}
+    return new_user_response
 
 
 @router.post("/login/", status_code=status.HTTP_200_OK)
 async def login(
     request: Request,
     user_credentials: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_db_session),
 ):
     # Filter search for user
-    user = (
-        db.query(MemberTable)
-        .filter(MemberTable.email == user_credentials.username)
-        .first()
+    user_query = select(MemberTable).filter(
+        MemberTable.email == user_credentials.username
     )
+    user_result = await db.execute(user_query)
+    user = user_result.scalars().first()
 
     if not user:
         raise HTTPException(
@@ -84,7 +96,7 @@ async def login(
             detail="Invalid Username or Password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if user.is_verified != True:
+    if not user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Account Not Verified"
         )
@@ -94,7 +106,7 @@ async def login(
 
 
 @router.post("/confirm-email/{token}/", status_code=status.HTTP_202_ACCEPTED)
-async def user_verification(token: str, db: Session = Depends(get_db_session)):
+async def user_verification(token: str, db: AsyncSession = Depends(get_db_session)):
     token_data = token_utils.verify_token(token)
     if not token_data:
         raise HTTPException(
@@ -102,19 +114,19 @@ async def user_verification(token: str, db: Session = Depends(get_db_session)):
             detail="Token for Email Verification has expired.",
         )
 
-    user = (
-        db.query(MemberTable).filter(MemberTable.email == token_data["email"]).first()
-    )
+    user_query = select(MemberTable).filter(MemberTable.email == token_data["email"])
+    user_result = await db.execute(user_query)
+    user = user_result.scalars().first()
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with email {user.email} does not exist",
+            detail=f"User with email {token_data['email']} does not exist",
         )
-    user.is_verified = True
+    user.active = 1
     db.add(user)
-    db.commit()
-    db.refresh(user)
-    print(user)
+    await db.commit()
+    await db.refresh(user)
 
     return {
         "message": "Email Verification Successful",
@@ -126,11 +138,14 @@ async def user_verification(token: str, db: Session = Depends(get_db_session)):
 async def send_email_verfication(
     email_data: schemas.EmailSchema,
     request: Request,
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_db_session),
+    *,
+    background_tasks: BackgroundTasks
 ):
-    user_check = (
-        db.query(MemberTable).filter(MemberTable.email == email_data.email).first()
-    )
+    user_check_query = select(MemberTable).filter(MemberTable.email == email_data.email)
+    user_check_result = await db.execute(user_check_query)
+    user_check = user_check_result.scalars().first()
+
     if not user_check:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -138,7 +153,6 @@ async def send_email_verfication(
         )
 
     token = token_utils.token(email_data.email)
-    # print(token)
     email_verification_endpoint = f"{settings.frontend_url}auth/confirm-email/{token}/"
     mail_body = {
         "email": user_check.email,
@@ -146,19 +160,9 @@ async def send_email_verfication(
         "url": email_verification_endpoint,
     }
 
-    mail_status = await mailer_utils.send_email_async(
+    background_tasks.add_task(mailer_utils.send_email_async, **dict(
         subject="Email Verification: Registration Confirmation",
         email_to=user_check.email,
         body=mail_body,
         template="email_verification.html",
-    )
-    if mail_status:
-        return {
-            "message": "mail for Email Verification has been sent, kindly check your inbox.",
-            "status": status.HTTP_201_CREATED,
-        }
-    else:
-        return {
-            "message": "mail for Email Verification failled to send, kindly reach out to the server guy.",
-            "status": status.HTTP_503_SERVICE_UNAVAILABLE,
-        }
+    ))
