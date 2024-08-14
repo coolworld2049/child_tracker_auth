@@ -1,4 +1,4 @@
-FROM python:3.11.7-slim-bullseye as prod
+FROM python:3.11.7-slim-bullseye as child_tracker_auth
 RUN apt-get update && apt-get install -y \
   default-libmysqlclient-dev \
   gcc \
@@ -16,8 +16,8 @@ RUN poetry config cache-dir /tmp/poetry_cache
 COPY pyproject.toml poetry.lock /app/src/
 WORKDIR /app/src
 
-# Installing requirements
-RUN --mount=type=cache,target=/tmp/poetry_cache poetry install --only main
+RUN poetry install --only main
+
 # Removing gcc
 RUN apt-get purge -y \
   gcc \
@@ -25,10 +25,6 @@ RUN apt-get purge -y \
 
 # Copying actuall application
 COPY . /app/src/
-RUN --mount=type=cache,target=/tmp/poetry_cache poetry install --only main
 
 CMD ["/usr/local/bin/python", "-m", "child_tracker_auth"]
 
-FROM prod as dev
-
-RUN --mount=type=cache,target=/tmp/poetry_cache poetry install

@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   api:
     build:
@@ -6,11 +8,15 @@ services:
     image: child_tracker_auth:${CHILD_TRACKER_AUTH_VERSION:-latest}
     restart: always
     env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
+      - .env.prod
     environment:
-      CHILD_TRACKER_AUTH_HOST: 10.88.0.3
+      CHILD_TRACKER_AUTH_HOST: 0.0.0.0
+      CHILD_TRACKER_AUTH_DB_HOST: 10.88.0.3
+      CHILD_TRACKER_AUTH_DB_PORT: 3306
     ports:
       - "8000:8000"
+    networks:
+      - podman
+networks:
+  podman:
+    external: true

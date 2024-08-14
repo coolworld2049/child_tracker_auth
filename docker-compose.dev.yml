@@ -20,12 +20,11 @@ services:
     hostname: child_tracker_auth-db
     restart: always
     environment:
-      MARIADB_ROOT_USER: ${CHILD_TRACKER_AUTH_DB_USER}
-      MARIADB_ROOT_PASSWORD: ${CHILD_TRACKER_AUTH_DB_PASS}
-      MARIADB_USER: "child_tracker_auth"
-      MARIADB_PASSWORD: "child_tracker_auth"
+      MARIADB_ROOT_USER: ${MARIADB_ROOT_USER}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_USER: ${CHILD_TRACKER_AUTH_DB_USER}
+      MARIADB_PASSWORD: ${CHILD_TRACKER_AUTH_DB_PASS}
       MARIADB_DATABASE: ${CHILD_TRACKER_AUTH_DB_BASE}
-      ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
       - ./scripts:/docker-entrypoint-initdb.d/
       - child_tracker_auth-db-data:/bitnami/mariadb

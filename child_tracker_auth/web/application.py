@@ -1,5 +1,3 @@
-from importlib import metadata
-
 from fastapi import FastAPI
 from fastapi.responses import UJSONResponse
 
@@ -19,7 +17,6 @@ def get_app() -> FastAPI:
     configure_logging()
     app = FastAPI(
         title="child_tracker_auth",
-        version=metadata.version("child_tracker_auth"),
         lifespan=lifespan_setup,
         default_response_class=UJSONResponse,
     )
