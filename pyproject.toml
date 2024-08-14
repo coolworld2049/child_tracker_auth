@@ -8,7 +8,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.112.0"
-fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^13.0.0"}
+fastapi-users = {extras = ["oauth", "sqlalchemy"], path = "lib/fastapi-users"}
 uvicorn = {extras = ["standard"], version = "^0.30.5"}
 pydantic = "^2.8.2"
 pydantic-settings = "^2.4.0"
