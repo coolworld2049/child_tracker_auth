@@ -1,16 +1,15 @@
 from datetime import timedelta, datetime
-from jose import JWTError, jwt
 
-
-from child_tracker_auth.settings import settings
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from child_tracker_auth import schemas
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from child_tracker_auth import schemas
+from child_tracker_auth.settings import settings
+from db.base import MemberTable
 from db.dependencies import get_db_session
 
-# Oauth2 set up
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
@@ -28,13 +27,13 @@ def create_access_token(data: dict):
 
 
 def verify_access_token(token: str, credential_exception):
+    token_data = schemas.TokenData()
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         id: str = payload.get("user_id")
         if id is None:
             raise credential_exception
-
-        token_data = schemas.TokenData(id=id)
+        token_data.id = id
     except JWTError:
         raise credential_exception
     return token_data
@@ -49,5 +48,5 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     token = verify_access_token(token, credentials_exception)
-    user = db.query(models.User).filter(models.User.id == token.id).first()
+    user = db.query(MemberTable).filter(MemberTable.id == token.id).first()
     return user

@@ -7,10 +7,12 @@ from starlette.requests import Request
 
 import schemas
 from child_tracker_auth.security.oauth2 import create_access_token
-from child_tracker_auth.utils import token_utils, database_utils, mailer_utils
 from db.base import MemberTable
 from db.dependencies import get_db_session
+from security.crypto import get_password_hashed
+from security.token import generate_token, verify_token
 from settings import settings
+from utils.email import send_email_async
 
 router = APIRouter()
 
@@ -40,7 +42,7 @@ async def register(
         )
 
     # Hash the password
-    hashed_password = database_utils.get_password_hashed(user_credentials.password)
+    hashed_password = get_password_hashed(user_credentials.password)
     user_credentials.password = hashed_password
 
     new_user = MemberTable(
@@ -56,7 +58,7 @@ async def register(
     await db.refresh(new_user)
 
     if not user_credentials.active:
-        token = token_utils.token(user_credentials.email)
+        token = generate_token(user_credentials.email)
         email_verification_endpoint = f"{settings.frontend_url}/confirm-email/{token}/"
         mail_body = {
             "email": user_credentials.email,
@@ -64,11 +66,15 @@ async def register(
             "url": email_verification_endpoint,
         }
 
-        background_tasks.add_task(mailer_utils.send_email_async, **dict(
-            subject="Email Verification: Registration Confirmation",
-            email_to=user_credentials.email,
-            body=mail_body,
-            template="email_verification.html", ))
+        background_tasks.add_task(
+            send_email_async,
+            **dict(
+                subject="Email Verification: Registration Confirmation",
+                email_to=user_credentials.email,
+                body=mail_body,
+                template="email_verification.html",
+            ),
+        )
 
     new_user_response = schemas.RegistrationUserRepsonse(
         message="User registration successful",
@@ -107,7 +113,7 @@ async def login(
 
 @router.post("/confirm-email/{token}/", status_code=status.HTTP_202_ACCEPTED)
 async def user_verification(token: str, db: AsyncSession = Depends(get_db_session)):
-    token_data = token_utils.verify_token(token)
+    token_data = verify_token(token)
     if not token_data:
         raise HTTPException(
             status_code=status.HTTP_406_NOT_ACCEPTABLE,
@@ -140,7 +146,7 @@ async def send_email_verfication(
     request: Request,
     db: AsyncSession = Depends(get_db_session),
     *,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
 ):
     user_check_query = select(MemberTable).filter(MemberTable.email == email_data.email)
     user_check_result = await db.execute(user_check_query)
@@ -152,7 +158,7 @@ async def send_email_verfication(
             detail="User information does not exist",
         )
 
-    token = token_utils.token(email_data.email)
+    token = generate_token(email_data.email)
     email_verification_endpoint = f"{settings.frontend_url}auth/confirm-email/{token}/"
     mail_body = {
         "email": user_check.email,
@@ -160,9 +166,12 @@ async def send_email_verfication(
         "url": email_verification_endpoint,
     }
 
-    background_tasks.add_task(mailer_utils.send_email_async, **dict(
-        subject="Email Verification: Registration Confirmation",
-        email_to=user_check.email,
-        body=mail_body,
-        template="email_verification.html",
-    ))
+    background_tasks.add_task(
+        send_email_async,
+        **dict(
+            subject="Email Verification: Registration Confirmation",
+            email_to=user_check.email,
+            body=mail_body,
+            template="email_verification.html",
+        ),
+    )

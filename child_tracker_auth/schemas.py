@@ -26,3 +26,7 @@ class RegistrationUserRepsonse(BaseModel):
 
 class EmailSchema(BaseModel):
     email: EmailStr
+
+
+class TokenData(BaseModel):
+    id: str | None = None
