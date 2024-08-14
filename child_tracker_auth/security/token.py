@@ -1,4 +1,5 @@
 from itsdangerous import URLSafeTimedSerializer, BadTimeSignature, SignatureExpired
+from jose import jwt, JWTError
 from pydantic import EmailStr
 
 from settings import settings
@@ -21,3 +22,15 @@ def verify_token(token: str):
     except BadTimeSignature:
         return None
     return {"email": email, "check": True}
+
+
+def verify_refresh_token(token: str):
+    try:
+        payload = jwt.decode(token, settings.secret_key,
+                             algorithms=[settings.algorithm])
+        user_id: str = payload.get("user_id")
+        if user_id is None:
+            return None
+        return payload
+    except JWTError:
+        return None

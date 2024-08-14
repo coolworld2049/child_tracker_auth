@@ -6,7 +6,8 @@ from sqlalchemy.future import select
 from starlette.requests import Request
 
 import schemas
-from child_tracker_auth.security.oauth2 import create_access_token
+from child_tracker_auth.security.oauth2 import (create_access_token,
+                                                generate_refresh_token)
 from db.base import MemberTable
 from db.dependencies import get_db_session
 from security.crypto import get_password_hashed
@@ -102,13 +103,19 @@ async def login(
             detail="Invalid Username or Password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not user.is_verified:
+    if user.active == 0:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Account Not Verified"
         )
 
     access_token = create_access_token(data={"user_id": user.id})
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = generate_refresh_token(data={"user_id": user.id})
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
 
 
 @router.post("/confirm-email/{token}/", status_code=status.HTTP_202_ACCEPTED)

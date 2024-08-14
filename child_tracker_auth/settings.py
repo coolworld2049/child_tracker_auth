@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     secret_key: str
     algorithm: str
     access_token_expire_minutes: int
+    refresh_token_expire_minutes: int
 
     mail_username: str
     mail_password: str
