@@ -13,6 +13,8 @@ services:
     environment:
       CHILD_TRACKER_AUTH_HOST: 0.0.0.0
       CHILD_TRACKER_AUTH_DB_HOST: child_tracker_auth-db
+    ports:
+      - "8000:8000"
   db:
     image: docker.io/bitnami/mariadb:10.5.15
     hostname: child_tracker_auth-db
