@@ -5,15 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from starlette.requests import Request
 
-import schemas
+from child_tracker_auth import schemas
 from child_tracker_auth.security.oauth2 import (create_access_token,
                                                 generate_refresh_token)
-from db.base import MemberTable
-from db.dependencies import get_db_session
-from security.crypto import get_password_hashed
-from security.token import generate_token, verify_token
-from settings import settings
-from utils.email import send_email_async
+from child_tracker_auth.db.base import MemberTable
+from child_tracker_auth.db.dependencies import get_db_session
+from child_tracker_auth.security.crypto import get_password_hashed
+from child_tracker_auth.security.token import generate_token, verify_token
+from child_tracker_auth.settings import settings
+from child_tracker_auth.utils.email import send_email_async
 
 router = APIRouter()
 

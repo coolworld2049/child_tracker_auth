@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from child_tracker_auth import schemas
 from child_tracker_auth.settings import settings
-from db.base import MemberTable
-from db.dependencies import get_db_session
+from child_tracker_auth.db.base import MemberTable
+from child_tracker_auth.db.dependencies import get_db_session
 
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm

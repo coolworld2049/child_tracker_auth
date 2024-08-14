@@ -2,7 +2,7 @@ from itsdangerous import URLSafeTimedSerializer, BadTimeSignature, SignatureExpi
 from jose import jwt, JWTError
 from pydantic import EmailStr
 
-from settings import settings
+from child_tracker_auth.settings import settings
 
 token_algo = URLSafeTimedSerializer(
     settings.secret_key, salt="Email_Verification_&_Forgot_password"

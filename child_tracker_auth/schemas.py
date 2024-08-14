@@ -2,8 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
-from db.base import MemberTable
-from utils.sa_to_pydantic import sqlalchemy_to_pydantic
+from child_tracker_auth.db.base import MemberTable
+from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
 
 PydanticMember = sqlalchemy_to_pydantic(
     MemberTable, exclude=["password_pbkdf_hash", "password"]

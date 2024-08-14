@@ -5,7 +5,7 @@ from fastapi_mail.errors import ConnectionErrors
 from loguru import logger
 
 from child_tracker_auth.schemas import EmailStr
-from settings import settings
+from child_tracker_auth.settings import settings
 
 config = ConnectionConfig(
     MAIL_USERNAME=settings.mail_username,
