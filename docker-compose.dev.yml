@@ -1,0 +1,46 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: child_tracker_auth:${CHILD_TRACKER_AUTH_VERSION:-latest}
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      CHILD_TRACKER_AUTH_HOST: 0.0.0.0
+      CHILD_TRACKER_AUTH_DB_HOST: child_tracker_auth-db
+    ports:
+      - "8000:8000"
+  db:
+    image: docker.io/bitnami/mariadb:10.5.15
+    hostname: child_tracker_auth-db
+    restart: always
+    environment:
+      MARIADB_ROOT_USER: ${CHILD_TRACKER_AUTH_DB_USER}
+      MARIADB_ROOT_PASSWORD: ${CHILD_TRACKER_AUTH_DB_PASS}
+      MARIADB_USER: "child_tracker_auth"
+      MARIADB_PASSWORD: "child_tracker_auth"
+      MARIADB_DATABASE: ${CHILD_TRACKER_AUTH_DB_BASE}
+      ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - ./scripts:/docker-entrypoint-initdb.d/
+      - child_tracker_auth-db-data:/bitnami/mariadb
+    ports:
+      - '3306:3306'
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - --user=child_tracker_auth
+        - --password=child_tracker_auth
+      interval: 10s
+      timeout: 5s
+      retries: 40
+volumes:
+  child_tracker_auth-db-data:
+    name: child_tracker_auth-db-data
