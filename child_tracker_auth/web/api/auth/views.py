@@ -67,6 +67,7 @@ async def register(
             "email": user_credentials.email,
             "project_name": settings.project_name,
             "url": email_verification_endpoint,
+            "token": token
         }
 
         background_tasks.add_task(
@@ -173,6 +174,7 @@ async def send_email_verfication(
         "email": user_check.email,
         "project_name": settings.project_name,
         "url": email_verification_endpoint,
+        "token": token
     }
 
     background_tasks.add_task(
