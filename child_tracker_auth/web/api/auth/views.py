@@ -62,7 +62,7 @@ async def register(
 
     if user_credentials.active == 0:
         token = generate_token(user_credentials.email)
-        email_verification_endpoint = f"{settings.frontend_url}/confirm-email/{token}"
+        email_verification_endpoint = f"{settings.frontend_url}/{token}"
         mail_body = {
             "email": user_credentials.email,
             "project_name": settings.project_name,
@@ -169,7 +169,7 @@ async def send_email_verfication(
         )
 
     token = generate_token(email_data.email)
-    email_verification_endpoint = f"{settings.frontend_url}/confirm-email/{token}"
+    email_verification_endpoint = f"{settings.frontend_url}/{token}"
     mail_body = {
         "email": user_check.email,
         "project_name": settings.project_name,
