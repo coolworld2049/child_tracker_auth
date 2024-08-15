@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, BackgroundTasks
 from fastapi import Depends, HTTPException, status
 from fastapi.security.oauth2 import OAuth2PasswordRequestForm
@@ -6,11 +8,11 @@ from sqlalchemy.future import select
 from starlette.requests import Request
 
 from child_tracker_auth import schemas
-from child_tracker_auth.security.oauth2 import (create_access_token,
-                                                generate_refresh_token)
 from child_tracker_auth.db.base import MemberTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.security.crypto import get_password_hashed
+from child_tracker_auth.security.oauth2 import (create_access_token,
+                                                generate_refresh_token)
 from child_tracker_auth.security.token import generate_token, verify_token
 from child_tracker_auth.settings import settings
 from child_tracker_auth.utils.email import send_email_async
@@ -58,7 +60,7 @@ async def register(
     await db.commit()
     await db.refresh(new_user)
 
-    if not user_credentials.active:
+    if user_credentials.active == 0:
         token = generate_token(user_credentials.email)
         email_verification_endpoint = f"{settings.frontend_url}/confirm-email/{token}/"
         mail_body = {
@@ -87,7 +89,7 @@ async def register(
 @router.post("/login/", status_code=status.HTTP_200_OK)
 async def login(
     request: Request,
-    user_credentials: OAuth2PasswordRequestForm = Depends(),
+    user_credentials: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: AsyncSession = Depends(get_db_session),
 ):
     # Filter search for user
