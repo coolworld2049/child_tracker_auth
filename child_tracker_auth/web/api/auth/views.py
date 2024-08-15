@@ -121,7 +121,7 @@ async def login(
     }
 
 
-@router.post("/confirm-email/{token}/", status_code=status.HTTP_202_ACCEPTED)
+@router.get("/confirm-email/{token}/", status_code=status.HTTP_202_ACCEPTED)
 async def user_verification(token: str, db: AsyncSession = Depends(get_db_session)):
     token_data = verify_token(token)
     if not token_data:

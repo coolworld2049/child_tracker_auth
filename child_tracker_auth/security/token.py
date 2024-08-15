@@ -1,3 +1,5 @@
+import binascii
+
 from itsdangerous import URLSafeTimedSerializer, BadTimeSignature, SignatureExpired
 from jose import jwt, JWTError
 from pydantic import EmailStr
@@ -9,17 +11,17 @@ token_algo = URLSafeTimedSerializer(
 )
 
 
-def generate_token(email: EmailStr):
+def generate_token(email: EmailStr) -> str:
     _token = token_algo.dumps(email)
-    return _token
+    hex_token = binascii.hexlify(_token.encode()).decode()
+    return hex_token
 
 
-def verify_token(token: str):
+def verify_token(hex_token: str):
     try:
-        email = token_algo.loads(token, max_age=1800)
-    except SignatureExpired:
-        return None
-    except BadTimeSignature:
+        _token = binascii.unhexlify(hex_token.encode()).decode()
+        email = token_algo.loads(_token, max_age=1800)
+    except (SignatureExpired, BadTimeSignature, binascii.Error):
         return None
     return {"email": email, "check": True}
 
