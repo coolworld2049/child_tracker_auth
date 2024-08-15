@@ -28,8 +28,9 @@ def verify_token(hex_token: str):
 
 def verify_refresh_token(token: str):
     try:
-        payload = jwt.decode(token, settings.secret_key,
-                             algorithms=[settings.algorithm])
+        payload = jwt.decode(
+            token, settings.secret_key, algorithms=[settings.algorithm]
+        )
         user_id: str = payload.get("user_id")
         if user_id is None:
             return None

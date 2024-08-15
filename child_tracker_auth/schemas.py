@@ -30,3 +30,10 @@ class EmailSchema(BaseModel):
 
 class TokenData(BaseModel):
     id: str | None = None
+
+
+class ConfirmMailBody(BaseModel):
+    email: str
+    project_name: str
+    url: str
+    token: str

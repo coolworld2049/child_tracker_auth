@@ -41,7 +41,9 @@ def verify_access_token(token: str, credential_exception):
 
 def generate_refresh_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.refresh_token_expire_minutes)
+    expire = datetime.utcnow() + timedelta(
+        minutes=settings.refresh_token_expire_minutes
+    )
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt

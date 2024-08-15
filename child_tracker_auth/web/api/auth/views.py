@@ -10,9 +10,12 @@ from starlette.requests import Request
 from child_tracker_auth import schemas
 from child_tracker_auth.db.base import MemberTable
 from child_tracker_auth.db.dependencies import get_db_session
+from child_tracker_auth.security import crypto
 from child_tracker_auth.security.crypto import get_password_hashed
-from child_tracker_auth.security.oauth2 import (create_access_token,
-                                                generate_refresh_token)
+from child_tracker_auth.security.oauth2 import (
+    create_access_token,
+    generate_refresh_token,
+)
 from child_tracker_auth.security.token import generate_token, verify_token
 from child_tracker_auth.settings import settings
 from child_tracker_auth.utils.email import send_email_async
@@ -63,19 +66,17 @@ async def register(
     if user_credentials.active == 0:
         token = generate_token(user_credentials.email)
         email_verification_endpoint = f"{settings.frontend_url}/{token}"
-        mail_body = {
-            "email": user_credentials.email,
-            "project_name": settings.project_name,
-            "url": email_verification_endpoint,
-            "token": token
-        }
-
         background_tasks.add_task(
             send_email_async,
             **dict(
                 subject="Email Verification: Registration Confirmation",
                 email_to=user_credentials.email,
-                body=mail_body,
+                body=schemas.ConfirmMailBody(
+                    email=user_credentials.email,
+                    project_name=settings.project_name,
+                    url=email_verification_endpoint,
+                    token=token,
+                ).model_dump(),
                 template="email_verification.html",
             ),
         )
@@ -99,8 +100,8 @@ async def login(
     )
     user_result = await db.execute(user_query)
     user = user_result.scalars().first()
-
-    if not user:
+    verify_password = crypto.verify_password(user_credentials.password, user.password_pbkdf_hash)
+    if not user or verify_password is False:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Username or Password",
@@ -117,7 +118,7 @@ async def login(
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
     }
 
 
@@ -170,19 +171,17 @@ async def send_email_verfication(
 
     token = generate_token(email_data.email)
     email_verification_endpoint = f"{settings.frontend_url}/{token}"
-    mail_body = {
-        "email": user_check.email,
-        "project_name": settings.project_name,
-        "url": email_verification_endpoint,
-        "token": token
-    }
-
     background_tasks.add_task(
         send_email_async,
         **dict(
             subject="Email Verification: Registration Confirmation",
             email_to=user_check.email,
-            body=mail_body,
+            body=schemas.ConfirmMailBody(
+                email=user_check.email,
+                project_name=settings.project_name,
+                url=email_verification_endpoint,
+                token=token,
+            ).model_dump(),
             template="email_verification.html",
         ),
     )
