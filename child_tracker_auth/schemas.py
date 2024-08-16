@@ -6,13 +6,13 @@ from child_tracker_auth.db.base import MemberTable
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
 
 PydanticMember = sqlalchemy_to_pydantic(
-    MemberTable, exclude=["password_pbkdf_hash", "password"]
+    MemberTable, exclude=["password_pbkdf_hash", "password", "code", "token"]
 )
 
 
 class PydanticMemberCreate(BaseModel):
     email: EmailStr
-    password: str
+    phone: str
     name: str
     role: Literal["member", "admin", "editor", "manager"] = "member"
     active: int = Field(0, ge=0, le=1)
@@ -37,3 +37,21 @@ class ConfirmMailBody(BaseModel):
     project_name: str
     url: str
     token: str
+
+
+class ResponseModel(BaseModel):
+    message: str
+
+
+class LoginModel(BaseModel):
+    phone: str
+
+
+class AuthModel(BaseModel):
+    phone: str
+    code: int
+
+
+class TokenModel(BaseModel):
+    access_token: str
+    token_type: str = "bearer"

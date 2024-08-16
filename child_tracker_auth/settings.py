@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     project_name: str
     frontend_url: str
 
+    sms_provider_login: str
+    sms_provider_password: str
+
     @property
     def db_url(self) -> URL:
         """
