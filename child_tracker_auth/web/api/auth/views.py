@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from fastapi import Depends, HTTPException, status
 from loguru import logger
 from requests import HTTPError
+from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -40,7 +41,10 @@ async def register(
     db: AsyncSession = Depends(get_db_session),
 ):
     check_query = select(MemberTable).filter(
-        MemberTable.phone == user_credentials.phone
+        or_(
+            MemberTable.phone == user_credentials.phone,
+            MemberTable.email == user_credentials.email,
+        )
     )
     check_result = await db.execute(check_query)
     check = check_result.scalars().first()
@@ -62,9 +66,14 @@ async def register(
         phone=user_credentials.phone,
         code=code,
     )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
+    try:
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
 
     send_sms_code(phone=new_user.phone, code=code)
 
