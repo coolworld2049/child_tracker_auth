@@ -32,7 +32,7 @@ class EmailSchema(BaseModel):
 
 
 class TokenData(BaseModel):
-    id: str
+    id: int
     phone: str
 
 
