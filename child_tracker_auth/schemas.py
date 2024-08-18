@@ -2,12 +2,15 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
-from child_tracker_auth.db.base import MemberTable
+from child_tracker_auth.db.base import MemberTable, DeviceTable, LogTable
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
 
 PydanticMember = sqlalchemy_to_pydantic(
     MemberTable, exclude=["password_pbkdf_hash", "password", "code", "token"]
 )
+
+PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
+PydanticLog = sqlalchemy_to_pydantic(LogTable)
 
 
 class PydanticMemberCreate(BaseModel):

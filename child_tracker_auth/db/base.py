@@ -10,10 +10,12 @@ engine = create_engine(
 meta = sa.MetaData()
 meta.reflect(
     engine,
-    only={"members"},
+    only={"members", "devices", "logs"},
 )
 Base = automap_base(metadata=meta)
 Base.prepare()
 
 MemberTable = Base.classes.members
+DeviceTable = Base.classes.devices
+LogTable = Base.classes.logs
 engine.dispose(close=True)
