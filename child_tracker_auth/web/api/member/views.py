@@ -1,14 +1,16 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends
+from fastapi.params import Depends
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from child_tracker_auth import schemas
 from child_tracker_auth.db.base import DeviceTable, LogTable
 from child_tracker_auth.db.dependencies import get_db_session
+from child_tracker_auth.security.oauth2 import get_current_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 date_from_default: date = date.today().replace(day=date.today().day - 1)
 date_to_default: date = date.today().replace(day=date.today().day + 1)

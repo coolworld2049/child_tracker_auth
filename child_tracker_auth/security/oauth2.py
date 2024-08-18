@@ -1,42 +1,41 @@
 from datetime import timedelta, datetime
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from child_tracker_auth import schemas
-from child_tracker_auth.settings import settings
 from child_tracker_auth.db.base import MemberTable
 from child_tracker_auth.db.dependencies import get_db_session
+from child_tracker_auth.settings import settings
 
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/")
+token_key = APIKeyHeader(name="Authorization")
 
 
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
 def verify_access_token(token: str, credential_exception):
-    token_data = schemas.TokenData()
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        id: str = payload.get("user_id")
         if id is None:
             raise credential_exception
-        token_data.id = id
+        token_data = schemas.TokenData(
+            id=payload.get("user_id"), phone=payload.get("phone")
+        )
+        return token_data
     except JWTError:
         raise credential_exception
-    return token_data
 
 
 def generate_refresh_token(data: dict):
@@ -50,7 +49,7 @@ def generate_refresh_token(data: dict):
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db_session)
+    token: str = Depends(token_key), db: Session = Depends(get_db_session)
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

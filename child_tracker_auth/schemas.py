@@ -32,7 +32,8 @@ class EmailSchema(BaseModel):
 
 
 class TokenData(BaseModel):
-    id: str | None = None
+    id: str
+    phone: str
 
 
 class ConfirmMailBody(BaseModel):
