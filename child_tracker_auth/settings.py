@@ -1,6 +1,7 @@
 import enum
 from pathlib import Path
 from tempfile import gettempdir
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from yarl import URL
@@ -20,25 +21,14 @@ class LogLevel(str, enum.Enum):
 
 
 class Settings(BaseSettings):
-    """
-    Application settings.
-
-    These parameters can be configured
-    with environment variables.
-    """
-
     host: str = "127.0.0.1"
     port: int = 8000
-    # quantity of workers for uvicorn
     workers_count: int = 1
-    # Enable uvicorn reloading
     reload: bool = False
 
-    # Current environment
-    environment: str = "dev"
-
     log_level: LogLevel = LogLevel.INFO
-    # Variables for the database
+    environment: Literal["dev", "prod"] = "dev"
+
     db_host: str = "localhost"
     db_port: int = 3306
     db_user: str
@@ -49,19 +39,13 @@ class Settings(BaseSettings):
     secret_key: str
     algorithm: str
     access_token_expire_minutes: int
-    refresh_token_expire_minutes: int
-
-    mail_username: str
-    mail_password: str
-    mail_from: str
-    mail_port: int
-    mail_server: str
 
     project_name: str
-    frontend_url: str
 
     sms_provider_login: str
     sms_provider_password: str
+
+    media_path: str = "./media"
 
     @property
     def db_url(self) -> URL:

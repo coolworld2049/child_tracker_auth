@@ -13,6 +13,8 @@ services:
       CHILD_TRACKER_AUTH_HOST: 0.0.0.0
       CHILD_TRACKER_AUTH_DB_HOST: 10.88.0.3
       CHILD_TRACKER_AUTH_DB_PORT: 3306
+    volumes:
+      - /home/docker/staff/data/var/www/vhosts/kidl/public/upload/media:public/upload/media
     ports:
       - "8000:8000"
     networks:

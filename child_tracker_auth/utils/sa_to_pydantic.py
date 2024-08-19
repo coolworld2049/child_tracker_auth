@@ -6,9 +6,9 @@ orm_config = ConfigDict(from_attributes=True)
 
 
 def sqlalchemy_to_pydantic(
-    db_model: Type, *, config: Type = orm_config, exclude: Container[str] = []
+    db_model: Type, *, config: Type = orm_config, exclude: Container[str] = []  # noqa
 ) -> Type[BaseModel]:
-    table = db_model.metadata.tables[db_model.__name__]
+    table = db_model.metadata.tables[db_model.__name__]  # noqa
     fields = {}
     for column in table.columns:
         name = column.name

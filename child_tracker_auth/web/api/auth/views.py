@@ -1,4 +1,5 @@
 import random
+from datetime import timedelta
 
 from fastapi import APIRouter
 from fastapi import Depends, HTTPException, status
@@ -15,10 +16,12 @@ from child_tracker_auth.db.base import MemberTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.security.oauth2 import (
     create_access_token,
+    get_current_member,
 )
+from child_tracker_auth.settings import settings
 from child_tracker_auth.utils.sms import send_verification_sms
 
-router = APIRouter()
+router = APIRouter(tags=["Auth"])
 
 
 def send_sms_code(phone: str, code: int):
@@ -31,7 +34,7 @@ def send_sms_code(phone: str, code: int):
 
 
 @router.post(
-    "/register/",
+    "/register",
     status_code=status.HTTP_201_CREATED,
     response_model=schemas.RegistrationUserRepsonse,
 )
@@ -83,7 +86,7 @@ async def register(
     )
 
 
-@router.post("/login/", response_model=schemas.ResponseModel)
+@router.post("/login", response_model=schemas.ResponseModel)
 async def login(
     login_data: schemas.LoginModel,
     db: AsyncSession = Depends(get_db_session),
@@ -115,12 +118,8 @@ async def login(
     return schemas.ResponseModel(message="Verification code sent successfully")
 
 
-@router.post("/auth/")
-async def auth(
-    auth_data: schemas.AuthModel,
-    db: AsyncSession = Depends(get_db_session),
-):
-    user_query = select(MemberTable).filter(MemberTable.phone == auth_data.phone)
+async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
+    user_query = select(MemberTable).filter(MemberTable.phone == phone)
     user_result = await db.execute(user_query)
     user = user_result.scalars().first()
 
@@ -129,14 +128,20 @@ async def auth(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    if user.code != auth_data.code:
+    if user.token:
+        raise HTTPException(
+            status_code=status.HTTP_200_OK,
+            detail="Already verified",
+        )
+    if user.code != code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid code",
         )
 
-    data = {"user_id": user.id, "phone": user.phone}
-    access_token = create_access_token(data)
+    data = schemas.TokenData(user_id=user.id, phone=user.phone)
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(data, expires_delta=access_token_expires)
     try:
         user.token = access_token
         user.code = None
@@ -148,7 +153,37 @@ async def auth(
         logger.error(e)
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+    return user
 
+
+@router.post("/auth")
+async def auth(
+    auth_data: schemas.AuthModel,
+    db: AsyncSession = Depends(get_db_session),
+):
+    user = await auth_member_by_sms(phone=auth_data.phone, code=auth_data.code, db=db)
     return schemas.TokenModel(
-        access_token=access_token,
+        access_token=user.token,
     )
+
+
+@router.get("/logout", response_model=schemas.ResponseModel)
+async def logout(
+    db: AsyncSession = Depends(get_db_session),
+    current_member: schemas.PydanticMember = Depends(get_current_member),
+):
+    user_query = select(MemberTable).filter(MemberTable.phone == current_member.phone)
+    user_result = await db.execute(user_query)
+    user = user_result.scalars().first()
+
+    try:
+        user.token = None
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+
+    return schemas.ResponseModel(message="Successful logout")

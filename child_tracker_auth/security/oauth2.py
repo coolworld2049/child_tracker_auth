@@ -1,61 +1,65 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
-from sqlalchemy.orm import Session
+from sqlalchemy import select, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from child_tracker_auth import schemas
 from child_tracker_auth.db.base import MemberTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.settings import settings
 
-SECRET_KEY = settings.secret_key
-ALGORITHM = settings.algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
-
-token_key = APIKeyHeader(name="Authorization")
+token_header = APIKeyHeader(
+    name="Authorization", description="access_token", scheme_name="Access Token Auth"
+)
 
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+def create_access_token(
+    data: schemas.TokenData, expires_delta: timedelta | None = None
+):
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    data.exp = expire
+    encoded_jwt = jwt.encode(
+        data.model_dump(), settings.secret_key, algorithm=settings.algorithm
+    )
     return encoded_jwt
 
 
 def verify_access_token(token: str, credential_exception):
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        payload = jwt.decode(token, settings.secret_key, algorithms=settings.algorithm)
         if id is None:
             raise credential_exception
-        token_data = schemas.TokenData(
-            id=payload.get("user_id"), phone=payload.get("phone")
-        )
-        return token_data
+        return schemas.TokenData(**payload)
     except JWTError:
         raise credential_exception
 
 
-def generate_refresh_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(
-        minutes=settings.refresh_token_expire_minutes
-    )
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-async def get_current_user(
-    token: str = Depends(token_key), db: Session = Depends(get_db_session)
+async def get_current_member(
+    token: Annotated[str, Depends(token_header)],
+    db: AsyncSession = Depends(get_db_session),
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+        headers={"Authorization": "Bearer"},
     )
-    token = verify_access_token(token, credentials_exception)
-    user = db.query(MemberTable).filter(MemberTable.id == token.id).first()
+    verified_token = verify_access_token(token, credentials_exception)
+    user_query = select(MemberTable).filter(
+        and_(
+            MemberTable.id == verified_token.user_id,
+            MemberTable.phone == verified_token.phone,
+        )
+    )
+    user_result = await db.execute(user_query)
+    _user = user_result.scalars().first()
+    if _user is None or _user.token != token:
+        raise credentials_exception
+    user = schemas.PydanticMember(**_user.__dict__)
     return user

@@ -1,16 +1,21 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
-from child_tracker_auth.db.base import MemberTable, DeviceTable, LogTable
+from child_tracker_auth.db.base import MemberTable, DeviceTable, LogTable, FileTable
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
 
 PydanticMember = sqlalchemy_to_pydantic(
     MemberTable, exclude=["password_pbkdf_hash", "password", "code", "token"]
 )
-
 PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
 PydanticLog = sqlalchemy_to_pydantic(LogTable)
+PydanticFile = sqlalchemy_to_pydantic(FileTable)
+
+
+class ResponseModel(BaseModel):
+    message: str
 
 
 class PydanticMemberCreate(BaseModel):
@@ -27,26 +32,6 @@ class RegistrationUserRepsonse(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class EmailSchema(BaseModel):
-    email: EmailStr
-
-
-class TokenData(BaseModel):
-    id: int
-    phone: str
-
-
-class ConfirmMailBody(BaseModel):
-    email: str
-    project_name: str
-    url: str
-    token: str
-
-
-class ResponseModel(BaseModel):
-    message: str
-
-
 class LoginModel(BaseModel):
     phone: str
 
@@ -54,6 +39,12 @@ class LoginModel(BaseModel):
 class AuthModel(BaseModel):
     phone: str
     code: int
+
+
+class TokenData(BaseModel):
+    user_id: int
+    phone: str
+    exp: datetime | None = None
 
 
 class TokenModel(BaseModel):
