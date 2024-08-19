@@ -1,5 +1,6 @@
 from datetime import date
 
+from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from sqlalchemy import select, and_
@@ -20,8 +21,8 @@ router = APIRouter(
     ),
 )
 
-date_from_default: date = date.today().replace(day=date.today().day - 1)
-date_to_default: date = date.today().replace(day=date.today().day + 1)
+date_from_default: date = date.today() - relativedelta(months=1)
+date_to_default: date = date.today() + relativedelta(months=1)
 
 log_type_values = get_enum_values(
     engine=engine, table_name="logs", column_name="log_type"
@@ -36,13 +37,10 @@ async def get_device_logs(
     log_type: str | None = Query(None, enum=log_type_values),
     db: AsyncSession = Depends(get_db_session),
 ):
-    q = select(LogTable).filter(
-        and_(
-            LogTable.device_id == id,
-            LogTable.log_type == log_type,
-            LogTable.date.between(date_from, date_to),
-        )
-    )
+    op_and = [LogTable.device_id == id, LogTable.date.between(date_from, date_to)]
+    if log_type is not None:
+        op_and.append(LogTable.log_type == log_type)
+    q = select(LogTable).filter(and_(*op_and))
     rq = await db.execute(q)
     r = rq.scalars().all()
     logs = [schemas.PydanticLog(**x.__dict__) for x in r]
@@ -57,10 +55,7 @@ async def get_device_files(
     db: AsyncSession = Depends(get_db_session),
 ):
     q = select(FileTable).filter(
-        and_(
-            FileTable.device_id == id,
-            FileTable.time.between(date_from, date_to),
-        )
+        and_(FileTable.device_id == id, FileTable.time.between(date_from, date_to))
     )
     rq = await db.execute(q)
     r = rq.scalars().all()
