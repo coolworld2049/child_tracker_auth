@@ -17,7 +17,7 @@ date_from_default: date = date.today() - relativedelta(months=1)
 date_to_default: date = date.today() + relativedelta(months=1)
 
 
-@router.get("/me")
+@router.get("/me", response_model=schemas.PydanticMember)
 async def get_member_me(
     current_member: schemas.PydanticMember = Depends(get_current_member),
 ):

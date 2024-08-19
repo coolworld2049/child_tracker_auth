@@ -156,7 +156,7 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
     return user
 
 
-@router.post("/auth")
+@router.post("/auth", response_model=schemas.TokenModel)
 async def auth(
     auth_data: schemas.AuthModel,
     db: AsyncSession = Depends(get_db_session),
