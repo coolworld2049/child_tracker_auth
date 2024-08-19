@@ -1,3 +1,4 @@
+import pathlib
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
@@ -5,6 +6,7 @@ from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
 from child_tracker_auth.db.base import LogTable, engine, FileTable
@@ -61,3 +63,19 @@ async def get_device_files(
     r = rq.scalars().all()
     logs = [schemas.PydanticFile(**x.__dict__) for x in r]
     return logs
+
+
+@router.get("/{device_id}/file/{file_id}", response_class=FileResponse)
+async def download_device_files(
+    device_id: int,
+    file_id: int,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(FileTable).filter(
+        and_(FileTable.id == file_id, FileTable.device_id == device_id)
+    )
+    rq = await db.execute(q)
+    r = rq.scalars().first()
+    m = schemas.PydanticFile(**r.__dict__)
+    file_path = pathlib.Path(settings.public_dir_path).parent.joinpath(str(m.path).lstrip("/"))
+    return FileResponse(file_path, media_type=m.type, filename=m.name)
