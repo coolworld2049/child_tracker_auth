@@ -30,6 +30,7 @@ bcrypt = "^4.2.0"
 itsdangerous = "^2.2.0"
 fastapi-mail = "^1.4.1"
 phonenumbers = "^8.13.43"
+python-dateutil = "^2.9.0.post0"
 
 
 [tool.poetry.group.dev.dependencies]
