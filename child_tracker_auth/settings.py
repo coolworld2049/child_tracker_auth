@@ -1,4 +1,5 @@
 import enum
+import pathlib
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Literal
@@ -45,7 +46,7 @@ class Settings(BaseSettings):
     sms_provider_login: str
     sms_provider_password: str
 
-    media_path: str = "./media"
+    public_dir_path: str = pathlib.Path(__file__).parent.parent.joinpath("public/files").__str__()
 
     @property
     def db_url(self) -> URL:
