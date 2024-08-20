@@ -2,8 +2,12 @@ from typing import Literal
 
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
+from loguru import logger
 from sqlalchemy import select, and_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
+from starlette.exceptions import HTTPException
 
 from child_tracker_auth import schemas
 from child_tracker_auth.db.base import SettingsTable
@@ -29,3 +33,26 @@ async def get_settings(
     r = await db.execute(q)
     settings = [schemas.PydanticSettings(**x.__dict__) for x in r.scalars().all()]
     return settings
+
+
+@router.put("/", response_model=schemas.PydanticSettings)
+async def update_setting(
+    id: int,
+    value: str,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(SettingsTable).filter(SettingsTable.id == id)
+    r = await db.execute(q)
+    setting = r.scalars().first()
+
+    try:
+        setting.value = value
+        db.add(setting)
+        await db.commit()
+        await db.refresh(setting)
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+
+    return schemas.PydanticSettings(**setting.__dict__)
