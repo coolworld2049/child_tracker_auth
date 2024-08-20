@@ -1,7 +1,6 @@
 import pathlib
 from datetime import date
 
-from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from sqlalchemy import select, and_
@@ -14,6 +13,7 @@ from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.db.enums import get_enum_values
 from child_tracker_auth.security.oauth2 import get_current_member
 from child_tracker_auth.settings import settings
+from child_tracker_auth.web.api.const import date_from_default, date_to_default
 
 router = APIRouter(
     prefix="/devices",
@@ -22,9 +22,6 @@ router = APIRouter(
         [Depends(get_current_member)] if settings.environment == "prod" else None
     ),
 )
-
-date_from_default: date = date.today() - relativedelta(months=1)
-date_to_default: date = date.today() + relativedelta(months=1)
 
 log_type_values = get_enum_values(
     engine=engine, table_name="logs", column_name="log_type"

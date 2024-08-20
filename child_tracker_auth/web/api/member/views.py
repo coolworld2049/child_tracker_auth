@@ -10,11 +10,9 @@ from child_tracker_auth import schemas
 from child_tracker_auth.db.base import DeviceTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.security.oauth2 import get_current_member
+from child_tracker_auth.web.api.const import date_from_default, date_to_default
 
 router = APIRouter(prefix="/members", tags=["Members"])
-
-date_from_default: date = date.today() - relativedelta(months=1)
-date_to_default: date = date.today() + relativedelta(months=1)
 
 
 @router.get("/me", response_model=schemas.PydanticMember)
