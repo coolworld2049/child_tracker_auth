@@ -29,7 +29,7 @@ services:
       MARIADB_DATABASE: ${CHILD_TRACKER_AUTH_DB_BASE}
       ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
-      - ./scripts:/docker-entrypoint-initdb.d/
+      - ./scripts/initdb:/docker-entrypoint-initdb.d/
       - child_tracker_auth-db-data:/bitnami/mariadb
     ports:
       - '3306:3306'

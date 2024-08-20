@@ -15,7 +15,7 @@ from child_tracker_auth import schemas
 from child_tracker_auth.db.base import MemberTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.security.oauth2 import (
-    create_access_token,
+    create_access_refresh_token,
     get_current_member,
 )
 from child_tracker_auth.settings import settings
@@ -104,7 +104,6 @@ async def login(
     code = random.randint(1000, 9999)
     try:
         user.code = code
-        user.token = None
         db.add(user)
         await db.commit()
         await db.refresh(user)
@@ -128,11 +127,6 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    if user.token:
-        raise HTTPException(
-            status_code=status.HTTP_200_OK,
-            detail="Already verified",
-        )
     if user.code != code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -140,10 +134,15 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
         )
 
     data = schemas.TokenData(user_id=user.id, phone=user.phone)
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    access_token = create_access_token(data, expires_delta=access_token_expires)
+
+    access_token = create_access_refresh_token(
+        data, expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
+    )
+    refresh_token = create_access_refresh_token(
+        data, expires_delta=timedelta(minutes=settings.refresh_token_expire_minutes)
+    )
+
     try:
-        user.token = access_token
         user.code = None
         user.active = 1
         db.add(user)
@@ -153,7 +152,8 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
         logger.error(e)
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
-    return user
+
+    return schemas.TokenModel(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.post("/auth", response_model=schemas.TokenModel)
@@ -161,29 +161,26 @@ async def auth(
     auth_data: schemas.AuthModel,
     db: AsyncSession = Depends(get_db_session),
 ):
-    user = await auth_member_by_sms(phone=auth_data.phone, code=auth_data.code, db=db)
-    return schemas.TokenModel(
-        access_token=user.token,
+    token_data = await auth_member_by_sms(
+        phone=auth_data.phone, code=auth_data.code, db=db
+    )
+    return token_data
+
+
+@router.post("/auth/refresh_token", response_model=schemas.TokenModel)
+async def auth(
+    form_data: schemas.RefreshTokenModel,
+    db: AsyncSession = Depends(get_db_session),
+):
+    user = await get_current_member(token=form_data.refresh_token, db=db)
+
+    data = schemas.TokenData(user_id=user.id, phone=user.phone)
+
+    access_token = create_access_refresh_token(
+        data, expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
+    )
+    refresh_token = create_access_refresh_token(
+        data, expires_delta=timedelta(minutes=settings.refresh_token_expire_minutes)
     )
 
-
-@router.get("/logout", response_model=schemas.ResponseModel)
-async def logout(
-    db: AsyncSession = Depends(get_db_session),
-    current_member: schemas.PydanticMember = Depends(get_current_member),
-):
-    user_query = select(MemberTable).filter(MemberTable.phone == current_member.phone)
-    user_result = await db.execute(user_query)
-    user = user_result.scalars().first()
-
-    try:
-        user.token = None
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-    except SQLAlchemyError as e:
-        logger.error(e)
-        await db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
-
-    return schemas.ResponseModel(message="Successful logout")
+    return schemas.TokenModel(access_token=access_token, refresh_token=refresh_token)

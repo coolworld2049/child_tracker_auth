@@ -10,11 +10,9 @@ from child_tracker_auth import schemas
 from child_tracker_auth.db.base import DeviceTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.security.oauth2 import get_current_member
+from child_tracker_auth.web.api.const import date_from_default, date_to_default
 
 router = APIRouter(prefix="/members", tags=["Members"])
-
-date_from_default: date = date.today() - relativedelta(months=1)
-date_to_default: date = date.today() + relativedelta(months=1)
 
 
 @router.get("/me", response_model=schemas.PydanticMember)
@@ -26,6 +24,8 @@ async def get_member_me(
 
 @router.get("/me/devices", response_model=list[schemas.PydanticDevice])
 async def get_member_devices(
+    offset: int = 0,
+    limit: int = 100,
     date_from: date = date_from_default,
     date_to: date = date_to_default,
     db: AsyncSession = Depends(get_db_session),
@@ -33,7 +33,7 @@ async def get_member_devices(
 ):
     q = select(DeviceTable).where(DeviceTable.member_id == current_member.id)
     q = q.filter(and_(DeviceTable.time.between(date_from, date_to)))
-
+    q = q.offset(offset).limit(limit)
     r = await db.execute(q)
     devices = [schemas.PydanticDevice(**x.__dict__) for x in r.scalars().all()]
     return devices

@@ -1,7 +1,6 @@
 import pathlib
 from datetime import date
 
-from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from sqlalchemy import select, and_
@@ -14,6 +13,7 @@ from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.db.enums import get_enum_values
 from child_tracker_auth.security.oauth2 import get_current_member
 from child_tracker_auth.settings import settings
+from child_tracker_auth.web.api.const import date_from_default, date_to_default
 
 router = APIRouter(
     prefix="/devices",
@@ -23,9 +23,6 @@ router = APIRouter(
     ),
 )
 
-date_from_default: date = date.today() - relativedelta(months=1)
-date_to_default: date = date.today() + relativedelta(months=1)
-
 log_type_values = get_enum_values(
     engine=engine, table_name="logs", column_name="log_type"
 )
@@ -34,6 +31,8 @@ log_type_values = get_enum_values(
 @router.get("/{id}/logs", response_model=list[schemas.PydanticLog])
 async def get_device_logs(
     id: int,
+    offset: int = 0,
+    limit: int = 100,
     date_from: date = date_from_default,
     date_to: date = date_to_default,
     log_type: str | None = Query(None, enum=log_type_values),
@@ -43,6 +42,7 @@ async def get_device_logs(
     if log_type is not None:
         op_and.append(LogTable.log_type == log_type)
     q = select(LogTable).filter(and_(*op_and))
+    q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
     logs = [schemas.PydanticLog(**x.__dict__) for x in r]
@@ -52,6 +52,8 @@ async def get_device_logs(
 @router.get("/{id}/files", response_model=list[schemas.PydanticFile])
 async def get_device_files(
     id: int,
+    offset: int = 0,
+    limit: int = 100,
     date_from: date = date_from_default,
     date_to: date = date_to_default,
     db: AsyncSession = Depends(get_db_session),
@@ -59,6 +61,7 @@ async def get_device_files(
     q = select(FileTable).filter(
         and_(FileTable.device_id == id, FileTable.time.between(date_from, date_to))
     )
+    q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
     logs = [schemas.PydanticFile(**x.__dict__) for x in r]
@@ -77,5 +80,7 @@ async def download_device_files(
     rq = await db.execute(q)
     r = rq.scalars().first()
     m = schemas.PydanticFile(**r.__dict__)
-    file_path = pathlib.Path(settings.public_dir_path).parent.joinpath(str(m.path).lstrip("/"))
+    file_path = pathlib.Path(settings.public_dir_path).parent.joinpath(
+        str(m.path).lstrip("/")
+    )
     return FileResponse(file_path, media_type=m.type, filename=m.name)

@@ -3,7 +3,13 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
-from child_tracker_auth.db.base import MemberTable, DeviceTable, LogTable, FileTable
+from child_tracker_auth.db.base import (
+    MemberTable,
+    DeviceTable,
+    LogTable,
+    FileTable,
+    SettingsTable,
+)
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
 
 PydanticMember = sqlalchemy_to_pydantic(
@@ -12,6 +18,7 @@ PydanticMember = sqlalchemy_to_pydantic(
 PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
 PydanticLog = sqlalchemy_to_pydantic(LogTable)
 PydanticFile = sqlalchemy_to_pydantic(FileTable)
+PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
 
 
 class ResponseModel(BaseModel):
@@ -47,6 +54,10 @@ class TokenData(BaseModel):
     exp: datetime | None = None
 
 
-class TokenModel(BaseModel):
+class RefreshTokenModel(BaseModel):
+    refresh_token: str
+
+
+class TokenModel(RefreshTokenModel):
     access_token: str
     token_type: str = "bearer"
