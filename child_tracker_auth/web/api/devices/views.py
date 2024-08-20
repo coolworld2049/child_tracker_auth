@@ -34,6 +34,8 @@ log_type_values = get_enum_values(
 @router.get("/{id}/logs", response_model=list[schemas.PydanticLog])
 async def get_device_logs(
     id: int,
+    offset: int = 0,
+    limit: int = 100,
     date_from: date = date_from_default,
     date_to: date = date_to_default,
     log_type: str | None = Query(None, enum=log_type_values),
@@ -43,6 +45,7 @@ async def get_device_logs(
     if log_type is not None:
         op_and.append(LogTable.log_type == log_type)
     q = select(LogTable).filter(and_(*op_and))
+    q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
     logs = [schemas.PydanticLog(**x.__dict__) for x in r]
@@ -52,6 +55,8 @@ async def get_device_logs(
 @router.get("/{id}/files", response_model=list[schemas.PydanticFile])
 async def get_device_files(
     id: int,
+    offset: int = 0,
+    limit: int = 100,
     date_from: date = date_from_default,
     date_to: date = date_to_default,
     db: AsyncSession = Depends(get_db_session),
@@ -59,6 +64,7 @@ async def get_device_files(
     q = select(FileTable).filter(
         and_(FileTable.device_id == id, FileTable.time.between(date_from, date_to))
     )
+    q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
     logs = [schemas.PydanticFile(**x.__dict__) for x in r]
