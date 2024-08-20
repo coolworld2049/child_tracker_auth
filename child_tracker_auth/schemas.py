@@ -47,6 +47,10 @@ class TokenData(BaseModel):
     exp: datetime | None = None
 
 
-class TokenModel(BaseModel):
+class RefreshTokenModel(BaseModel):
+    refresh_token: str
+
+
+class TokenModel(RefreshTokenModel):
     access_token: str
     token_type: str = "bearer"

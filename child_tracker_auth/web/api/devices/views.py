@@ -77,5 +77,7 @@ async def download_device_files(
     rq = await db.execute(q)
     r = rq.scalars().first()
     m = schemas.PydanticFile(**r.__dict__)
-    file_path = pathlib.Path(settings.public_dir_path).parent.joinpath(str(m.path).lstrip("/"))
+    file_path = pathlib.Path(settings.public_dir_path).parent.joinpath(
+        str(m.path).lstrip("/")
+    )
     return FileResponse(file_path, media_type=m.type, filename=m.name)

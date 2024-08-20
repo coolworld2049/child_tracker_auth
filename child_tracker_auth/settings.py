@@ -39,14 +39,18 @@ class Settings(BaseSettings):
 
     secret_key: str
     algorithm: str
+
     access_token_expire_minutes: int
+    refresh_token_expire_minutes: int
 
     project_name: str
 
     sms_provider_login: str
     sms_provider_password: str
 
-    public_dir_path: str = pathlib.Path(__file__).parent.parent.joinpath("public/files").__str__()
+    public_dir_path: str = (
+        pathlib.Path(__file__).parent.parent.joinpath("public/files").__str__()
+    )
 
     @property
     def db_url(self) -> URL:

@@ -17,7 +17,7 @@ token_header = APIKeyHeader(
 )
 
 
-def create_access_token(
+def create_access_refresh_token(
     data: schemas.TokenData, expires_delta: timedelta | None = None
 ):
     if expires_delta:
@@ -59,7 +59,7 @@ async def get_current_member(
     )
     user_result = await db.execute(user_query)
     _user = user_result.scalars().first()
-    if _user is None or _user.token != token:
+    if _user is None:
         raise credentials_exception
     user = schemas.PydanticMember(**_user.__dict__)
     return user
