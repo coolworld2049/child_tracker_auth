@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import (BaseModel, EmailStr, ConfigDict, Field, computed_field)
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
 
 from child_tracker_auth.db.base import (
     MemberTable,
@@ -69,10 +69,8 @@ class TokenModel(RefreshTokenModel):
     token_type: str = "bearer"
 
 
-class PhoneCall(BaseModel):
+class Phone(BaseModel):
     name: str
-    type: str
-    duration: int
 
     @computed_field
     @property
@@ -89,3 +87,14 @@ class PhoneCall(BaseModel):
         if len(spl) < 2:
             return None
         return spl[1]
+
+
+class PhoneCall(Phone):
+    name: str
+    type: str
+    duration: int
+
+
+class PhoneBookItem(BaseModel):
+    name: str
+    phone: str
