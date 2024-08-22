@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
 
 from child_tracker_auth.db.base import (
     MemberTable,
@@ -9,7 +9,9 @@ from child_tracker_auth.db.base import (
     LogTable,
     FileTable,
     SettingsTable,
+    engine,
 )
+from child_tracker_auth.db.enums import get_enum_values
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
 
 PydanticMember = sqlalchemy_to_pydantic(
@@ -19,6 +21,10 @@ PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
 PydanticLog = sqlalchemy_to_pydantic(LogTable)
 PydanticFile = sqlalchemy_to_pydantic(FileTable)
 PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
+
+log_type_values = get_enum_values(
+    engine=engine, table_name="logs", column_name="log_type"
+)
 
 
 class ResponseModel(BaseModel):
@@ -61,3 +67,34 @@ class RefreshTokenModel(BaseModel):
 class TokenModel(RefreshTokenModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class Phone(BaseModel):
+    name: str
+
+    @computed_field
+    @property
+    def phone(self) -> str:
+        spl = self.name.split(" ")
+        if len(spl) < 1:
+            return self.name
+        return spl[0]
+
+    @computed_field
+    @property
+    def sub(self) -> str:
+        spl = self.name.split(" ")
+        if len(spl) < 2:
+            return None
+        return spl[1]
+
+
+class PhoneCall(Phone):
+    name: str
+    type: str
+    duration: int
+
+
+class PhoneBookItem(BaseModel):
+    name: str
+    phone: str

@@ -1,16 +1,18 @@
+import collections
 import pathlib
 from datetime import date
 
+import pandas as pd
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
-from child_tracker_auth.db.base import LogTable, engine, FileTable
+from child_tracker_auth.db.base import LogTable, FileTable
 from child_tracker_auth.db.dependencies import get_db_session
-from child_tracker_auth.db.enums import get_enum_values
+from child_tracker_auth.schemas import log_type_values
 from child_tracker_auth.security.oauth2 import get_current_member
 from child_tracker_auth.settings import settings
 from child_tracker_auth.web.api.const import date_from_default, date_to_default
@@ -21,10 +23,6 @@ router = APIRouter(
     dependencies=(
         [Depends(get_current_member)] if settings.environment == "prod" else None
     ),
-)
-
-log_type_values = get_enum_values(
-    engine=engine, table_name="logs", column_name="log_type"
 )
 
 
@@ -68,14 +66,14 @@ async def get_device_files(
     return logs
 
 
-@router.get("/{device_id}/file/{file_id}", response_class=FileResponse)
+@router.get("/{id}/file/{file_id}", response_class=FileResponse)
 async def download_device_files(
-    device_id: int,
+    id: int,
     file_id: int,
     db: AsyncSession = Depends(get_db_session),
 ):
     q = select(FileTable).filter(
-        and_(FileTable.id == file_id, FileTable.device_id == device_id)
+        and_(FileTable.id == file_id, FileTable.device_id == id)
     )
     rq = await db.execute(q)
     r = rq.scalars().first()
@@ -84,3 +82,115 @@ async def download_device_files(
         str(m.path).lstrip("/")
     )
     return FileResponse(file_path, media_type=m.type, filename=m.name)
+
+
+@router.get(
+    "/{id}/phone_book",
+    response_model=dict[str, list[schemas.PhoneBookItem]],
+    description="dict key - uppercase alphabetic letter",
+)
+async def get_device_phone_book(
+    id: int,
+    offset: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = text(
+        f"""
+    select
+        l.name as name
+    from
+        logs l
+    join devices d on
+        d.id = l.device_id
+    where
+        d.id = :device_id
+        and l.log_type in ('in_call', 'out_call', 'out_sms')
+    group by l.name
+    limit :limit offset :offset
+    """
+    )
+    rq = await db.execute(
+        q,
+        {
+            "limit": limit,
+            "offset": offset,
+            "device_id": id,
+        },
+    )
+    r = rq.mappings().all()
+    df = pd.DataFrame(r)
+
+    def process_raw_name(s: pd.Series):
+        """
+        :returns: dict[name, phone]
+        """
+        return {
+            str(x.split(" ")[1]): x.split(" ")[0] for x in s if len(x.split(" ")) == 2
+        }
+
+    name_phone_dict: dict = df.apply(process_raw_name).tolist()[0]
+    phone_book_dict: dict[str, list[schemas.PhoneBookItem]] = collections.defaultdict(
+        list
+    )
+    for name, phone in name_phone_dict.items():
+        key = name[0].lower()
+        phone_book_dict[key].append(schemas.PhoneBookItem(name=name, phone=phone))
+
+    phone_book = dict(sorted(phone_book_dict.items(), key=lambda c: c[0]))
+    return phone_book
+
+
+@router.get(
+    "/{id}/calls",
+    response_model=dict[str, list[schemas.PhoneCall]],
+    description="dict key - date e.g 2024-08-22",
+)
+async def get_device_calls(
+    id: int,
+    offset: int = 0,
+    limit: int = 100,
+    date_from: date = date_from_default,
+    date_to: date = date_to_default,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = text(
+        f"""
+    select
+        l.name as name,
+        l.log_type as type,
+        l.duration as duration,
+        l.`date` as date
+    from
+        logs l
+    join devices d on
+        d.id = l.device_id
+    where
+        d.id = :device_id
+        and l.log_type in ('in_call', 'out_call', 'out_sms')
+        and (l.`date` between :date_from and :date_to)
+    limit :limit OFFSET :offset
+    """
+    )
+    rq = await db.execute(
+        q,
+        {
+            "limit": limit,
+            "offset": offset,
+            "device_id": id,
+            "date_from": date_from.__str__(),
+            "date_to": date_to.__str__(),
+        },
+    )
+    r = rq.mappings().all()
+    phone_data_df = pd.DataFrame(r)
+    phone_data_df_by_date = (
+        phone_data_df.groupby("date")
+        .apply(lambda g: g.to_dict(orient="records"))
+        .to_dict()
+    )
+    calls = {
+        k.__str__(): [schemas.PhoneCall(**vv) for vv in v]
+        for k, v in phone_data_df_by_date.items()
+    }
+    return calls
