@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from sqlalchemy import select, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.exceptions import HTTPException
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
@@ -36,10 +37,13 @@ async def get_device_logs(
     log_type: str | None = Query(None, enum=log_type_values),
     db: AsyncSession = Depends(get_db_session),
 ):
-    op_and = [LogTable.device_id == id, LogTable.date.between(date_from, date_to)]
-    if log_type is not None:
-        op_and.append(LogTable.log_type == log_type)
-    q = select(LogTable).filter(and_(*op_and))
+    q = select(LogTable).filter(
+        and_(
+            LogTable.device_id == id,
+            LogTable.log_type == log_type,
+            LogTable.date.between(date_from, date_to),
+        )
+    )
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
@@ -194,3 +198,61 @@ async def get_device_calls(
         for k, v in phone_data_df_by_date.items()
     }
     return calls
+
+
+@router.get(
+    "/{id}/stat",
+    response_model=list[schemas.PydanticLogStats]
+    | dict[str, list[schemas.PydanticLogStats]],
+)
+async def get_device_statistics(
+    id: int,
+    date_from: date = date_from_default,
+    date_to: date = date_to_default,
+    app_name: str | None = None,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = text(
+        """
+        select
+            id,
+            name,
+            title,
+            sum(duration) as duration,
+            `date`
+        from
+            logs l
+        WHERE
+            l.log_type = 'app'
+            and l.device_id = :device_id
+            and (l.`date` between :date_from and :date_to)
+        GROUP by
+            name, `date`
+        """
+    )
+
+    rq = await db.execute(
+        q,
+        {
+            "device_id": id,
+            "date_from": date_from.__str__(),
+            "date_to": date_to.__str__(),
+        },
+    )
+    r = rq.mappings().all()
+    df = pd.DataFrame(r)
+    if app_name:
+        df = df.loc[df["name"] == app_name]
+    if len(df) < 1:
+        raise HTTPException(status_code=404, detail="Not found")
+    # stats = [schemas.PydanticLogStats(**item.to_dict()) for i, item in df.iterrows()]
+
+    df_grouped = (
+        df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
+    )
+    stats = {
+        k.__str__(): [schemas.PydanticLogStats(**vv) for vv in v]
+        for k, v in df_grouped.items()
+    }
+
+    return stats

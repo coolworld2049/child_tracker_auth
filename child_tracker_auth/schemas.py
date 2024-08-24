@@ -19,6 +19,10 @@ PydanticMember = sqlalchemy_to_pydantic(
 )
 PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
 PydanticLog = sqlalchemy_to_pydantic(LogTable)
+PydanticLogStats = sqlalchemy_to_pydantic(
+    LogTable, exclude={"device_id", "time", "wcSection_id", "wcCategory_id", "log_type"}
+)
+
 PydanticFile = sqlalchemy_to_pydantic(FileTable)
 PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
 
