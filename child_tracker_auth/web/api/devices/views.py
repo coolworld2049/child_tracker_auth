@@ -192,6 +192,8 @@ limit :limit OFFSET :offset
     )
     r = rq.mappings().all()
     phone_data_df = pd.DataFrame(r)
+    if len(phone_data_df) < 1:
+        return {"": []}
     phone_data_df_by_date = (
         phone_data_df.groupby("date")
         .apply(lambda g: g.to_dict(orient="records"))
