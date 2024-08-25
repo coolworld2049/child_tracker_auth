@@ -1,4 +1,5 @@
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
@@ -102,3 +103,30 @@ class PhoneCall(Phone):
 class PhoneBookItem(BaseModel):
     name: str
     phone: str
+
+
+def generate_random_time():
+    return timedelta(
+        hours=random.randint(0, 23),
+    ).seconds
+
+
+class DeviceUsageAggregatedData(BaseModel):
+    limit: int = Field(default_factory=generate_random_time)
+    avg: int = Field(default_factory=generate_random_time)
+    today_exp: int = Field(
+        default_factory=generate_random_time,
+        description="Осталось в использовании на сегодня",
+    )
+
+
+class DeviceUsageData(BaseModel):
+    week_day: int
+    hour: int
+    duration: int
+
+
+class DeviceUsage(BaseModel):
+    name: str
+    usage_data: list[DeviceUsageData]
+    agg_data: DeviceUsageAggregatedData

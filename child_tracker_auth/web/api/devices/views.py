@@ -1,13 +1,14 @@
 import collections
+import json
 import pathlib
 from datetime import date
+from random import randint
 
 import pandas as pd
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from sqlalchemy import select, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.exceptions import HTTPException
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
@@ -160,20 +161,20 @@ async def get_device_calls(
 ):
     q = text(
         f"""
-    select
-        l.name as name,
-        l.log_type as type,
-        l.duration as duration,
-        l.`date` as date
-    from
-        logs l
-    join devices d on
-        d.id = l.device_id
-    where
-        d.id = :device_id
-        and l.log_type in ('in_call', 'out_call', 'out_sms')
-        and (l.`date` between :date_from and :date_to)
-    limit :limit OFFSET :offset
+select
+    l.name as name,
+    l.log_type as type,
+    l.duration as duration,
+    l.`date` as date
+from
+    logs l
+join devices d on
+    d.id = l.device_id
+where
+    d.id = :device_id
+    and l.log_type in ('in_call', 'out_call', 'out_sms')
+    and (l.`date` between :date_from and :date_to)
+limit :limit OFFSET :offset
     """
     )
     rq = await db.execute(
@@ -202,8 +203,7 @@ async def get_device_calls(
 
 @router.get(
     "/{id}/stat",
-    response_model=list[schemas.PydanticLogStats]
-    | dict[str, list[schemas.PydanticLogStats]],
+    response_model=dict[date, list[schemas.DeviceUsage]],
 )
 async def get_device_statistics(
     id: int,
@@ -214,23 +214,41 @@ async def get_device_statistics(
 ):
     q = text(
         """
-        select
-            id,
-            name,
-            title,
-            sum(duration) as duration,
-            `date`
-        from
-            logs l
-        WHERE
-            l.log_type = 'app'
-            and l.device_id = :device_id
-            and (l.`date` between :date_from and :date_to)
-        GROUP by
-            name, `date`
+SELECT
+    name,
+    JSON_ARRAYAGG(
+        JSON_OBJECT(
+            'week_day', week_day,
+            'hour', hour,
+            'duration', duration
+        )
+    ) AS usage_data_json,
+    MAX(`date`) AS `date`
+FROM (
+    SELECT
+        name,
+        DAYOFWEEK(`date`) AS week_day,
+        HOUR(`time`) AS hour,
+        SUM(`duration`) AS duration,
+        `date`
+    FROM
+        kidl.logs l
+    WHERE
+        `log_type` = 'app'
+        AND `device_id` = :device_id
+        AND name != ""
+        AND `date` BETWEEN :date_from AND :date_to
+    GROUP BY
+        name, DAYOFWEEK(`date`), HOUR(`time`)
+    ORDER BY
+        name, week_day, hour
+) AS ordered_logs
+GROUP BY
+    name
+ORDER BY
+    `date`;
         """
     )
-
     rq = await db.execute(
         q,
         {
@@ -244,15 +262,34 @@ async def get_device_statistics(
     if app_name:
         df = df.loc[df["name"] == app_name]
     if len(df) < 1:
-        raise HTTPException(status_code=404, detail="Not found")
-    # stats = [schemas.PydanticLogStats(**item.to_dict()) for i, item in df.iterrows()]
+        return {"": []}
 
     df_grouped = (
         df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
     )
-    stats = {
-        k.__str__(): [schemas.PydanticLogStats(**vv) for vv in v]
-        for k, v in df_grouped.items()
-    }
 
+    stats = {}
+    for k, v in df_grouped.items():
+        device_usage_list = []
+        for v2 in v:
+            usage_data_json = json.loads(v2["usage_data_json"])
+            sorted_usage_data = sorted(usage_data_json, key=lambda c: c["week_day"])
+
+            durations = list(
+                map(
+                    lambda c: c["duration"],
+                    sorted_usage_data,
+                )
+            )
+            avg_usage_seconds = sum(durations) // len(durations)
+            today_exp = avg_usage_seconds * randint(2, 4)
+            device_usage = schemas.DeviceUsage(
+                name=v2["name"],
+                usage_data=[schemas.DeviceUsageData(**v3) for v3 in sorted_usage_data],
+                agg_data=schemas.DeviceUsageAggregatedData(
+                    avg=avg_usage_seconds, today_exp=today_exp
+                ),
+            )
+            device_usage_list.append(device_usage)
+        stats[k] = device_usage_list
     return stats
