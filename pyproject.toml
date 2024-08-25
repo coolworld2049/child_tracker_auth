@@ -33,6 +33,7 @@ phonenumbers = "^8.13.43"
 python-dateutil = "^2.9.0.post0"
 pandas = "^2.2.2"
 numpy = "^2.1.0"
+mimesis = "^17.0.0"
 
 
 [tool.poetry.group.dev.dependencies]
