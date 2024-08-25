@@ -300,7 +300,7 @@ ORDER BY
 
 @router.get(
     "/{id}/messages/incoming",
-    response_model=dict[str, list[schemas.DeviceMessageIncoming]]
+    response_model=dict[str, list[schemas.DeviceMessageIncoming]],
 )
 async def get_device_incoming_sms_list(
     id: int,
@@ -329,7 +329,7 @@ async def get_device_incoming_sms_list(
                 avatar=internet.stock_image_url(keywords=["people"]),
                 name=vv["name"],
                 text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
-                time=vv["time"],
+                time=":".join(str(vv["time"]).split(":")[:2]),
             )
             for vv in v
         ]
