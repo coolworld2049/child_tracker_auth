@@ -7,6 +7,7 @@ from random import randint
 import pandas as pd
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
+from mimesis import Internet
 from sqlalchemy import select, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import FileResponse
@@ -18,6 +19,8 @@ from child_tracker_auth.schemas import log_type_values
 from child_tracker_auth.security.oauth2 import get_current_member
 from child_tracker_auth.settings import settings
 from child_tracker_auth.web.api.const import date_from_default, date_to_default
+
+internet = Internet()
 
 router = APIRouter(
     prefix="/devices",
@@ -203,7 +206,7 @@ limit :limit OFFSET :offset
 
 @router.get(
     "/{id}/stat",
-    response_model=dict[date, list[schemas.DeviceUsage]],
+    response_model=dict[str, list[schemas.DeviceUsage]],
 )
 async def get_device_statistics(
     id: int,
@@ -291,5 +294,45 @@ ORDER BY
                 ),
             )
             device_usage_list.append(device_usage)
-        stats[k] = device_usage_list
+        stats[k.__str__()] = device_usage_list
     return stats
+
+
+@router.get(
+    "/{id}/messages/incoming",
+    response_model=dict[str, list[schemas.DeviceMessageIncoming]]
+)
+async def get_device_incoming_sms_list(
+    id: int,
+    offset: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(LogTable).filter(
+        and_(
+            LogTable.device_id == id,
+            LogTable.log_type == "in_sms",
+        )
+    )
+    q = q.offset(offset).limit(limit)
+    rq = await db.execute(q)
+    r = rq.scalars().all()
+    df = pd.DataFrame([schemas.PydanticLog(**x.__dict__).model_dump() for x in r])
+    if len(df) < 1:
+        return {"": []}
+    df_by_date = (
+        df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
+    )
+    messages = {
+        k.__str__(): [
+            schemas.DeviceMessageIncoming(
+                avatar=internet.stock_image_url(keywords=["people"]),
+                name=vv["name"],
+                text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
+                time=vv["time"],
+            )
+            for vv in v
+        ]
+        for k, v in df_by_date.items()
+    }
+    return messages

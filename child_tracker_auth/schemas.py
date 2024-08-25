@@ -14,15 +14,13 @@ from child_tracker_auth.db.base import (
 )
 from child_tracker_auth.db.enums import get_enum_values
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
+from datetime import time
 
 PydanticMember = sqlalchemy_to_pydantic(
     MemberTable, exclude=["password_pbkdf_hash", "password", "code", "token"]
 )
 PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
 PydanticLog = sqlalchemy_to_pydantic(LogTable)
-PydanticLogStats = sqlalchemy_to_pydantic(
-    LogTable, exclude={"device_id", "time", "wcSection_id", "wcCategory_id", "log_type"}
-)
 
 PydanticFile = sqlalchemy_to_pydantic(FileTable)
 PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
@@ -130,3 +128,12 @@ class DeviceUsage(BaseModel):
     name: str
     usage_data: list[DeviceUsageData]
     agg_data: DeviceUsageAggregatedData
+
+
+class DeviceMessageIncoming(BaseModel):
+    avatar: str
+    name: str
+    text: str
+    time: time
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
