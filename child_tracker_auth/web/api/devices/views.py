@@ -129,6 +129,9 @@ async def get_device_phone_book(
     r = rq.mappings().all()
     df = pd.DataFrame(r)
 
+    if len(df) < 1:
+        return {"": []}
+
     def process_raw_name(s: pd.Series):
         """
         :returns: dict[name, phone]
