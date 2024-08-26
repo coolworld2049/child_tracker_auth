@@ -1,4 +1,5 @@
 import random
+import typing
 from datetime import datetime, timedelta
 from typing import Literal
 
@@ -80,7 +81,7 @@ class Phone(BaseModel):
         spl = self.name.split(" ")
         if len(spl) < 1:
             return self.name
-        return spl[0]
+        return spl[0].strip()
 
     @computed_field
     @property
@@ -88,7 +89,7 @@ class Phone(BaseModel):
         spl = self.name.split(" ")
         if len(spl) < 2:
             return None
-        return spl[1]
+        return spl[1].strip()
 
 
 class PhoneCall(Phone):
@@ -134,3 +135,7 @@ class DeviceMessageIncoming(BaseModel):
     name: str
     text: str
     time: str
+
+
+class ResonseModel(BaseModel):
+    data: list[typing.Any] = []
