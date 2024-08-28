@@ -3,6 +3,7 @@ import json
 import pathlib
 from datetime import date
 from random import randint
+from typing import Annotated
 
 import pandas as pd
 from fastapi import APIRouter
@@ -304,11 +305,14 @@ ORDER BY
 
 
 @router.get(
-    "/{id}/messages/incoming",
-    response_model=dict[str, list[schemas.DeviceMessageIncoming]],
+    "/{id}/messages",
+    response_model=dict[str, list[schemas.DeviceMessage]],
 )
-async def get_device_incoming_sms_list(
+async def get_device_messages(
     id: int,
+    message_type: Annotated[
+        list[schemas.LogMessageEnum], Query(enum=schemas.sms_type_values)
+    ],
     offset: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db_session),
@@ -316,7 +320,54 @@ async def get_device_incoming_sms_list(
     q = select(LogTable).filter(
         and_(
             LogTable.device_id == id,
-            LogTable.log_type == "in_sms",
+            LogTable.log_type.in_([x.value for x in message_type]),
+        )
+    )
+    q = q.offset(offset).limit(limit)
+
+    rq = await db.execute(q)
+    r = rq.scalars().all()
+    df = pd.DataFrame([schemas.PydanticLog(**x.__dict__).model_dump() for x in r])
+    if len(df) < 1:
+        return {"": []}
+    df_by_date = (
+        df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
+    )
+    messages = {
+        k.__str__(): [
+            schemas.DeviceMessage(
+                avatar=internet.stock_image_url(keywords=["people"]),
+                name=vv["name"],
+                text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
+                time=":".join(str(vv["time"]).split(":")[:2]),
+                message_type=vv["log_type"],
+            )
+            for vv in v
+        ]
+        for k, v in df_by_date.items()
+    }
+    return messages
+
+
+@router.get(
+    "/conversation/{name}",
+    response_model=schemas.Conversation,
+    description="`name` - Full text search",
+)
+async def get_conversation(
+    name: str,
+    *,
+    message_type: Annotated[
+        list[schemas.LogMessageEnum], Query(enum=schemas.sms_type_values)
+    ],
+    offset: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(LogTable).filter(
+        and_(
+            LogTable.log_type.in_([x.value for x in message_type]),
+            LogTable.name.like(f"%{name}%"),
         )
     )
     q = q.offset(offset).limit(limit)
@@ -330,14 +381,26 @@ async def get_device_incoming_sms_list(
     )
     messages = {
         k.__str__(): [
-            schemas.DeviceMessageIncoming(
+            schemas.DeviceMessage(
                 avatar=internet.stock_image_url(keywords=["people"]),
                 name=vv["name"],
                 text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
                 time=":".join(str(vv["time"]).split(":")[:2]),
+                message_type=vv["log_type"],
             )
             for vv in v
         ]
         for k, v in df_by_date.items()
     }
-    return messages
+
+    async def get_field_name():
+        q = select(LogTable.name).filter(and_(LogTable.name.like(f"%{name}%"))).limit(1)
+        rq = await db.execute(q)
+        r = rq.scalars().first()
+        return r
+
+    db_name = await get_field_name()
+    conversation = schemas.Conversation(
+        phone_info=schemas.Phone(name=db_name), messages=messages
+    )
+    return conversation
