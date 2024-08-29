@@ -213,6 +213,7 @@ limit :limit OFFSET :offset
 @router.get(
     "/{id}/stat",
     response_model=dict[str, list[schemas.DeviceUsage]],
+    description='`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated'
 )
 async def get_device_statistics(
     id: int,
@@ -228,8 +229,8 @@ SELECT
     JSON_ARRAYAGG(
         JSON_OBJECT(
             'week_day', week_day,
-            'hour', hour,
-            'duration', duration
+            'duration', duration,
+            'duration_timestamp', duration_timestamp
         )
     ) AS usage_data_json,
     MAX(`date`) AS `date`
@@ -237,8 +238,8 @@ FROM (
     SELECT
         name,
         DAYOFWEEK(`date`) AS week_day,
-        HOUR(`time`) AS hour,
-        SUM(`duration`) AS duration,
+        SEC_TO_TIME(SUM(`duration`)) AS duration,
+        SUM(`duration`) AS duration_timestamp,
         `date`
     FROM
         kidl.logs l
@@ -248,14 +249,14 @@ FROM (
         AND name != ""
         AND `date` BETWEEN :date_from AND :date_to
     GROUP BY
-        name, DAYOFWEEK(`date`), HOUR(`time`)
+        name, DAYOFWEEK(`date`)
     ORDER BY
-        name, week_day, hour
+        name, week_day
 ) AS ordered_logs
 GROUP BY
     name
 ORDER BY
-    `date`;
+    `date` DESC;
         """
     )
     rq = await db.execute(
@@ -286,7 +287,7 @@ ORDER BY
 
             durations = list(
                 map(
-                    lambda c: c["duration"],
+                    lambda c: c["duration_timestamp"],
                     sorted_usage_data,
                 )
             )

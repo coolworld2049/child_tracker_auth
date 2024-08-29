@@ -130,8 +130,7 @@ class DeviceUsageAggregatedData(BaseModel):
 
 class DeviceUsageData(BaseModel):
     week_day: int
-    hour: int
-    duration: int
+    duration: str
 
 
 class DeviceUsage(BaseModel):
