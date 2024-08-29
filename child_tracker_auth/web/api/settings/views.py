@@ -13,8 +13,15 @@ from child_tracker_auth import schemas
 from child_tracker_auth.db.base import SettingsTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.security.oauth2 import get_current_member
+from child_tracker_auth.settings import settings
 
-router = APIRouter(prefix="/settings", tags=["Settings"])
+router = APIRouter(
+    prefix="/settings",
+    tags=["Settings"],
+    dependencies=(
+        [Depends(get_current_member)] if settings.environment == "prod" else None
+    ),
+)
 
 
 @router.get("/", response_model=list[schemas.PydanticSettings])
@@ -23,7 +30,6 @@ async def get_settings(
     object_type: Literal["member", "section"],
     key: str | None = Query(None, description="Full text search"),
     db: AsyncSession = Depends(get_db_session),
-    current_member: schemas.PydanticMember = Depends(get_current_member),
 ):
     q = select(SettingsTable).filter(
         and_(
@@ -42,7 +48,6 @@ async def update_setting(
     id: int,
     value: str,
     db: AsyncSession = Depends(get_db_session),
-    current_member: schemas.PydanticMember = Depends(get_current_member),
 ):
     q = select(SettingsTable).filter(SettingsTable.id == id)
     r = await db.execute(q)

@@ -9,12 +9,12 @@ import pandas as pd
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from mimesis import Internet
-from sqlalchemy import select, and_, text
+from sqlalchemy import select, and_, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
-from child_tracker_auth.db.base import LogTable, FileTable
+from child_tracker_auth.db.base import LogTable, FileTable, DeviceTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.schemas import log_type_values
 from child_tracker_auth.security.oauth2 import get_current_member
@@ -30,6 +30,16 @@ router = APIRouter(
         [Depends(get_current_member)] if settings.environment == "prod" else None
     ),
 )
+
+
+@router.delete("/{id}")
+async def delete_device(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = delete(DeviceTable).where(DeviceTable.id == id)
+    await db.execute(q)
+    await db.commit()
 
 
 @router.get("/{id}/logs", response_model=list[schemas.PydanticLog])
@@ -213,7 +223,7 @@ limit :limit OFFSET :offset
 @router.get(
     "/{id}/stat",
     response_model=dict[str, list[schemas.DeviceUsage]],
-    description='`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated'
+    description="`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated",
 )
 async def get_device_statistics(
     id: int,
