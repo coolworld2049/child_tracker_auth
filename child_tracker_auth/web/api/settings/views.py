@@ -24,6 +24,21 @@ router = APIRouter(
 )
 
 
+@router.get("/keys", response_model=list[str])
+async def get_settings_keys(
+    object_type: Literal["member", "section"],
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(SettingsTable.key.distinct()).filter(
+        and_(
+            SettingsTable.object_type == object_type,
+        )
+    )
+    r = await db.execute(q)
+    keys = r.scalars().all()
+    return keys
+
+
 @router.get("/", response_model=list[schemas.PydanticSettings])
 async def get_settings(
     object_id: int,
