@@ -1,3 +1,4 @@
+import enum
 import random
 import typing
 from datetime import datetime, timedelta
@@ -28,6 +29,10 @@ PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
 log_type_values = get_enum_values(
     engine=engine, table_name="logs", column_name="log_type"
 )
+
+sms_type_values = list(filter(lambda c: "sms" in c, log_type_values))
+
+LogMessageEnum = enum.Enum("LogMessageEnum", [(x, x) for x in sms_type_values])
 
 
 class ResponseModel(BaseModel):
@@ -97,6 +102,11 @@ class PhoneCall(Phone):
     type: str
     duration: int
 
+    @computed_field
+    @property
+    def status(self) -> Literal["success", "fail"]:
+        return "success" if self.duration > 0 else "fail"
+
 
 class PhoneBookItem(BaseModel):
     name: str
@@ -120,8 +130,7 @@ class DeviceUsageAggregatedData(BaseModel):
 
 class DeviceUsageData(BaseModel):
     week_day: int
-    hour: int
-    duration: int
+    duration: str
 
 
 class DeviceUsage(BaseModel):
@@ -130,12 +139,18 @@ class DeviceUsage(BaseModel):
     agg_data: DeviceUsageAggregatedData
 
 
-class DeviceMessageIncoming(BaseModel):
+class DeviceMessage(BaseModel):
     avatar: str
     name: str
     text: str
     time: str
+    message_type: str
 
 
 class ResonseModel(BaseModel):
     data: list[typing.Any] = []
+
+
+class Conversation(BaseModel):
+    phone_info: Phone
+    messages: dict[str, list[DeviceMessage]]

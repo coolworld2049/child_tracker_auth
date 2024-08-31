@@ -1,23 +1,34 @@
 import collections
 import json
 import pathlib
+from contextlib import suppress
 from datetime import date
 from random import randint
+from typing import Annotated
 
 import pandas as pd
-from fastapi import APIRouter
-from fastapi.params import Depends, Query
+from fastapi import APIRouter, UploadFile
+from fastapi.params import Depends, Query, File
+from loguru import logger
 from mimesis import Internet
-from sqlalchemy import select, and_, text
+from sqlalchemy import select, and_, text, delete
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
-from child_tracker_auth.db.base import LogTable, FileTable
+from child_tracker_auth.db.base import LogTable, FileTable, DeviceTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.schemas import log_type_values
 from child_tracker_auth.security.oauth2 import get_current_member
 from child_tracker_auth.settings import settings
+from child_tracker_auth.storage.dependencies import (
+    create_storage_client,
+)
+from child_tracker_auth.storage.service import upload_file_to_storage
 from child_tracker_auth.web.api.const import date_from_default, date_to_default
 
 internet = Internet()
@@ -212,6 +223,7 @@ limit :limit OFFSET :offset
 @router.get(
     "/{id}/stat",
     response_model=dict[str, list[schemas.DeviceUsage]],
+    description="`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated",
 )
 async def get_device_statistics(
     id: int,
@@ -227,8 +239,8 @@ SELECT
     JSON_ARRAYAGG(
         JSON_OBJECT(
             'week_day', week_day,
-            'hour', hour,
-            'duration', duration
+            'duration', duration,
+            'duration_timestamp', duration_timestamp
         )
     ) AS usage_data_json,
     MAX(`date`) AS `date`
@@ -236,8 +248,8 @@ FROM (
     SELECT
         name,
         DAYOFWEEK(`date`) AS week_day,
-        HOUR(`time`) AS hour,
-        SUM(`duration`) AS duration,
+        SEC_TO_TIME(SUM(`duration`)) AS duration,
+        SUM(`duration`) AS duration_timestamp,
         `date`
     FROM
         kidl.logs l
@@ -247,14 +259,14 @@ FROM (
         AND name != ""
         AND `date` BETWEEN :date_from AND :date_to
     GROUP BY
-        name, DAYOFWEEK(`date`), HOUR(`time`)
+        name, DAYOFWEEK(`date`)
     ORDER BY
-        name, week_day, hour
+        name, week_day
 ) AS ordered_logs
 GROUP BY
     name
 ORDER BY
-    `date`;
+    `date` DESC;
         """
     )
     rq = await db.execute(
@@ -285,7 +297,7 @@ ORDER BY
 
             durations = list(
                 map(
-                    lambda c: c["duration"],
+                    lambda c: c["duration_timestamp"],
                     sorted_usage_data,
                 )
             )
@@ -304,11 +316,14 @@ ORDER BY
 
 
 @router.get(
-    "/{id}/messages/incoming",
-    response_model=dict[str, list[schemas.DeviceMessageIncoming]],
+    "/{id}/messages",
+    response_model=dict[str, list[schemas.DeviceMessage]],
 )
-async def get_device_incoming_sms_list(
+async def get_device_messages(
     id: int,
+    message_type: Annotated[
+        list[schemas.LogMessageEnum], Query(enum=schemas.sms_type_values)
+    ],
     offset: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db_session),
@@ -316,7 +331,54 @@ async def get_device_incoming_sms_list(
     q = select(LogTable).filter(
         and_(
             LogTable.device_id == id,
-            LogTable.log_type == "in_sms",
+            LogTable.log_type.in_([x.value for x in message_type]),
+        )
+    )
+    q = q.offset(offset).limit(limit)
+
+    rq = await db.execute(q)
+    r = rq.scalars().all()
+    df = pd.DataFrame([schemas.PydanticLog(**x.__dict__).model_dump() for x in r])
+    if len(df) < 1:
+        return {"": []}
+    df_by_date = (
+        df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
+    )
+    messages = {
+        k.__str__(): [
+            schemas.DeviceMessage(
+                avatar=internet.stock_image_url(keywords=["people"]),
+                name=vv["name"],
+                text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
+                time=":".join(str(vv["time"]).split(":")[:2]),
+                message_type=vv["log_type"],
+            )
+            for vv in v
+        ]
+        for k, v in df_by_date.items()
+    }
+    return messages
+
+
+@router.get(
+    "/conversation/{name}",
+    response_model=schemas.Conversation,
+    description="`name` - Full text search",
+)
+async def get_conversation(
+    name: str,
+    *,
+    message_type: Annotated[
+        list[schemas.LogMessageEnum], Query(enum=schemas.sms_type_values)
+    ],
+    offset: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(LogTable).filter(
+        and_(
+            LogTable.log_type.in_([x.value for x in message_type]),
+            LogTable.name.like(f"%{name}%"),
         )
     )
     q = q.offset(offset).limit(limit)
@@ -330,14 +392,92 @@ async def get_device_incoming_sms_list(
     )
     messages = {
         k.__str__(): [
-            schemas.DeviceMessageIncoming(
+            schemas.DeviceMessage(
                 avatar=internet.stock_image_url(keywords=["people"]),
                 name=vv["name"],
                 text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
                 time=":".join(str(vv["time"]).split(":")[:2]),
+                message_type=vv["log_type"],
             )
             for vv in v
         ]
         for k, v in df_by_date.items()
     }
-    return messages
+
+    async def get_field_name():
+        q = select(LogTable.name).filter(and_(LogTable.name.like(f"%{name}%"))).limit(1)
+        rq = await db.execute(q)
+        r = rq.scalars().first()
+        return r
+
+    db_name = await get_field_name()
+    conversation = schemas.Conversation(
+        phone_info=schemas.Phone(name=db_name), messages=messages
+    )
+    return conversation
+
+
+@router.delete("/{id}")
+async def delete_device(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(DeviceTable).where(DeviceTable.id == id)
+    rq = await db.execute(q)
+    device = rq.scalars().first()
+    bucket_name = DeviceTable.__name__
+    with suppress(Exception):
+        async with create_storage_client() as storage_client:
+            await storage_client.delete_object(
+                Bucket=bucket_name,
+                Key=device.avatar_url,
+            )
+    try:
+        q_delete = delete(DeviceTable).where(DeviceTable.id == id)
+        await db.execute(q_delete)
+        await db.commit()
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+
+
+@router.post("/{id}/upload-avatar/", response_model=schemas.PydanticDevice)
+async def upload_device_avatar(
+    request: Request,
+    id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(DeviceTable).filter(
+        and_(
+            DeviceTable.id == id,
+        )
+    )
+    rq = await db.execute(q)
+    device = rq.scalars().first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    file_extension = file.filename.split(".")[-1]
+    bucket_name = DeviceTable.__name__
+    async with create_storage_client() as storage_client:
+        if bucket_name not in request.app.state.storage_bucket_names:
+            await storage_client.create_bucket(Bucket=bucket_name, ACL="public-read")
+        url = await upload_file_to_storage(
+            s3_client=storage_client,
+            file=file.file,
+            file_extension=file_extension,
+            bucket_name=bucket_name,
+        )
+    try:
+        assert url is not None, "url is None"
+        device.avatar_url = url
+        db.add(device)
+        await db.commit()
+        await db.refresh(device)
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+    return schemas.PydanticDevice(**device.__dict__)
