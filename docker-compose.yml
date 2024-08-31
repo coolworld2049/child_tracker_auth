@@ -2,6 +2,7 @@ version: "3.8"
 
 services:
   api:
+    user: root
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -20,5 +21,7 @@ services:
     networks:
       - podman
 networks:
+  web:
+    external: true
   podman:
     external: true
