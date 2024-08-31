@@ -1,16 +1,22 @@
 import collections
 import json
 import pathlib
+from contextlib import suppress
 from datetime import date
 from random import randint
 from typing import Annotated
 
 import pandas as pd
-from fastapi import APIRouter
-from fastapi.params import Depends, Query
+from fastapi import APIRouter, UploadFile
+from fastapi.params import Depends, Query, File
+from loguru import logger
 from mimesis import Internet
 from sqlalchemy import select, and_, text, delete
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
@@ -19,6 +25,10 @@ from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.schemas import log_type_values
 from child_tracker_auth.security.oauth2 import get_current_member
 from child_tracker_auth.settings import settings
+from child_tracker_auth.storage.dependencies import (
+    create_storage_client,
+)
+from child_tracker_auth.storage.service import upload_file_to_storage
 from child_tracker_auth.web.api.const import date_from_default, date_to_default
 
 internet = Internet()
@@ -30,16 +40,6 @@ router = APIRouter(
         [Depends(get_current_member)] if settings.environment == "prod" else None
     ),
 )
-
-
-@router.delete("/{id}")
-async def delete_device(
-    id: int,
-    db: AsyncSession = Depends(get_db_session),
-):
-    q = delete(DeviceTable).where(DeviceTable.id == id)
-    await db.execute(q)
-    await db.commit()
 
 
 @router.get("/{id}/logs", response_model=list[schemas.PydanticLog])
@@ -415,3 +415,69 @@ async def get_conversation(
         phone_info=schemas.Phone(name=db_name), messages=messages
     )
     return conversation
+
+
+@router.delete("/{id}")
+async def delete_device(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(DeviceTable).where(DeviceTable.id == id)
+    rq = await db.execute(q)
+    device = rq.scalars().first()
+    bucket_name = DeviceTable.__name__
+    with suppress(Exception):
+        async with create_storage_client() as storage_client:
+            await storage_client.delete_object(
+                Bucket=bucket_name,
+                Key=device.avatar_url,
+            )
+    try:
+        q_delete = delete(DeviceTable).where(DeviceTable.id == id)
+        await db.execute(q_delete)
+        await db.commit()
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+
+
+@router.post("/{id}/upload-avatar/", response_model=schemas.PydanticDevice)
+async def upload_device_avatar(
+    request: Request,
+    id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(DeviceTable).filter(
+        and_(
+            DeviceTable.id == id,
+        )
+    )
+    rq = await db.execute(q)
+    device = rq.scalars().first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    file_extension = file.filename.split(".")[-1]
+    bucket_name = DeviceTable.__name__
+    async with create_storage_client() as storage_client:
+        if bucket_name not in request.app.state.storage_bucket_names:
+            await storage_client.create_bucket(Bucket=bucket_name, ACL="public-read")
+        url = await upload_file_to_storage(
+            s3_client=storage_client,
+            file=file.file,
+            file_extension=file_extension,
+            bucket_name=bucket_name,
+        )
+    try:
+        assert url is not None, "url is None"
+        device.avatar_url = url
+        db.add(device)
+        await db.commit()
+        await db.refresh(device)
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+    return schemas.PydanticDevice(**device.__dict__)

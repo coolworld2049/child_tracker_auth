@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     public_dir_path: str = (
         pathlib.Path(__file__).parent.parent.joinpath("public/files").__str__()
     )
+    storage_endpoint_url: str
+    storage_region: str
+    storage_access_key: str
+    storage_secret_key: str
 
     @property
     def db_url(self) -> URL:
