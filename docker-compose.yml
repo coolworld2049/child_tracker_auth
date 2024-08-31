@@ -18,10 +18,7 @@ services:
     volumes:
       - /home/docker/staff/data/var/www/vhosts/kidl/public/files:/app/src/public/files
     networks:
-      - network
       - podman
 networks:
-  network:
-    driver: bridge
   podman:
     external: true
