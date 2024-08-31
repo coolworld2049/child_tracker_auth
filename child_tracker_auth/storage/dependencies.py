@@ -24,13 +24,16 @@ def create_storage_client() -> S3Client:
 
 async def on_startup_storage(app: FastAPI):
     logger.info("Fetch storage buckets")
-    async with create_storage_client() as sc:
-        buckets = await sc.list_buckets()
-        bucket_names = []
-        for bucket in buckets.get("Buckets", []):
-            bucket_names.append(bucket["Name"])
-        app.state.storage_bucket_names = bucket_names  # noqa
-        return bucket_names
+    try:
+        async with create_storage_client() as sc:
+            buckets = await sc.list_buckets()
+            bucket_names = []
+            for bucket in buckets.get("Buckets", []):
+                bucket_names.append(bucket["Name"])
+            app.state.storage_bucket_names = bucket_names  # noqa
+            return bucket_names
+    except Exception as e:
+        logger.error(e)
 
 
 async def on_shutdown_storage(app: FastAPI):

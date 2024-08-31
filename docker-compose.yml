@@ -21,7 +21,5 @@ services:
     networks:
       - podman
 networks:
-  web:
-    external: true
   podman:
     external: true
