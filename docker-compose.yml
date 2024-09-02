@@ -14,12 +14,8 @@ services:
       CHILD_TRACKER_AUTH_HOST: 0.0.0.0
       CHILD_TRACKER_AUTH_DB_HOST: 10.88.0.3
       CHILD_TRACKER_AUTH_DB_PORT: 3306
-    ports:
-      - "8000:8000"
     volumes:
       - /home/docker/staff/data/var/www/vhosts/kidl/public/files:/app/src/public/files
-    networks:
-      - podman
     dns:
       - 8.8.8.8
       - 8.8.4.4
