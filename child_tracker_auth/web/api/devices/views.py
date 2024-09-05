@@ -20,7 +20,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
-from child_tracker_auth.db.base import LogTable, FileTable, DeviceTable
+from child_tracker_auth.db.base import (LogTable, FileTable, DeviceTable, MediaTable)
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.schemas import log_type_values
 from child_tracker_auth.security.oauth2 import get_current_member
@@ -66,41 +66,127 @@ async def get_device_logs(
     return logs
 
 
-@router.get("/{id}/files", response_model=list[schemas.PydanticFile])
+@router.get("/files/mime-types", response_model=list[str])
+async def get_files_mime_types(
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(FileTable.type.distinct()).filter(FileTable.type != "")
+    rq = await db.execute(q)
+    r = rq.scalars().all()
+    return r
+
+
+@router.get("/files", response_model=list[schemas.PydanticFile])
 async def get_device_files(
-    id: int,
+    device_id: int | None = None,
+    section_id: int | None = None,
     offset: int = 0,
     limit: int = 100,
     date_from: date = date_from_default,
     date_to: date = date_to_default,
+    mime_type: str | None = None,
     db: AsyncSession = Depends(get_db_session),
 ):
-    q = select(FileTable).filter(
-        and_(FileTable.device_id == id, FileTable.time.between(date_from, date_to))
-    )
+    and_f = [FileTable.time.between(date_from, date_to)]
+    if device_id:
+        and_f.append(FileTable.device_id == device_id)
+    if section_id:
+        and_f.append(FileTable.section_id == section_id)
+    if mime_type:
+        and_f.append(FileTable.type == mime_type)
+    q = select(FileTable).filter(and_(*and_f))
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
+    if len(r) < 1:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     logs = [schemas.PydanticFile(**x.__dict__) for x in r]
     return logs
 
 
-@router.get("/{id}/file/{file_id}", response_class=FileResponse)
+@router.get("/files/{id}", response_class=FileResponse)
 async def download_device_files(
     id: int,
-    file_id: int,
     db: AsyncSession = Depends(get_db_session),
 ):
-    q = select(FileTable).filter(
-        and_(FileTable.id == file_id, FileTable.device_id == id)
-    )
+    q = select(FileTable).filter(and_(FileTable.id == id))
     rq = await db.execute(q)
     r = rq.scalars().first()
-    m = schemas.PydanticFile(**r.__dict__)
-    file_path = pathlib.Path(settings.public_dir_path).parent.joinpath(
-        str(m.path).lstrip("/")
-    )
-    return FileResponse(file_path, media_type=m.type, filename=m.name)
+    if not r:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    db_file = schemas.PydanticFile(**r.__dict__)
+    file_path = pathlib.Path(settings.public_dir_path)
+    if not str(db_file.path).startswith("/mnt"):
+        file_path = file_path.joinpath(
+            str(db_file.path).lstrip("/")
+        )
+    else:
+        parts = pathlib.Path(db_file.path).parts
+        for i, part in enumerate(parts):
+            if str(part).startswith("member_"):
+                file_path = pathlib.Path("/".join(parts[i:]).lstrip("/"))
+                break
+        file_path = pathlib.Path(settings.mnt_public_path).joinpath(file_path)
+    media_type = db_file.type
+    if db_file.type == "report":
+        media_type = "text/html"
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="File not found")
+    return FileResponse(file_path, media_type=media_type, filename=db_file.name)
+
+
+# Media
+
+
+@router.get("/media/mime-types", response_model=list[str])
+async def get_media_mime_types(
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(MediaTable.type.distinct()).filter(MediaTable.type != "")
+    rq = await db.execute(q)
+    r = rq.scalars().all()
+    return r
+
+
+@router.get("/media", response_model=list[schemas.PydanticMedia])
+async def get_device_media(
+    offset: int = 0,
+    limit: int = 100,
+    mime_type: str | None = None,
+    db: AsyncSession = Depends(get_db_session),
+):
+    and_f = []
+    if mime_type:
+        and_f.append(MediaTable.type == mime_type)
+    q = select(MediaTable).filter(and_(*and_f))
+    q = q.offset(offset).limit(limit)
+    rq = await db.execute(q)
+    r = rq.scalars().all()
+    if len(r) < 1:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    media = [schemas.PydanticMedia(**x.__dict__) for x in r]
+    return media
+
+
+@router.get("/media/{id}", response_class=FileResponse)
+async def download_device_files(
+    id: int,
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(MediaTable).filter(and_(MediaTable.id == id))
+    rq = await db.execute(q)
+    r = rq.scalars().first()
+    if not r:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    db_media_file = schemas.PydanticMedia(**r.__dict__)
+    file_path = pathlib.Path(settings.public_dir_path).joinpath(
+        str(db_media_file.path).lstrip("/"))
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="File not found")
+    return FileResponse(file_path, media_type=db_media_file.type,
+                        filename=db_media_file.name)
 
 
 @router.get(
@@ -172,8 +258,6 @@ async def get_device_calls(
     id: int,
     offset: int = 0,
     limit: int = 100,
-    date_from: date = date_from_default,
-    date_to: date = date_to_default,
     db: AsyncSession = Depends(get_db_session),
 ):
     q = text(
@@ -190,7 +274,6 @@ join devices d on
 where
     d.id = :device_id
     and l.log_type in ('in_call', 'out_call', 'out_sms')
-    and (l.`date` between :date_from and :date_to)
 limit :limit OFFSET :offset
     """
     )
@@ -200,8 +283,6 @@ limit :limit OFFSET :offset
             "limit": limit,
             "offset": offset,
             "device_id": id,
-            "date_from": date_from.__str__(),
-            "date_to": date_to.__str__(),
         },
     )
     r = rq.mappings().all()

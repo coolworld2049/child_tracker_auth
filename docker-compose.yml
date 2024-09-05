@@ -15,7 +15,8 @@ services:
       CHILD_TRACKER_AUTH_DB_HOST: 10.88.0.3
       CHILD_TRACKER_AUTH_DB_PORT: 3306
     volumes:
-      - /home/docker/staff/data/var/www/vhosts/kidl/public/files:/app/src/public/files
+      - /home/docker/staff/data/var/www/vhosts/kidl/public/:/app/src/public/
+      - /mnt/data/var/www/vhosts/kidl/public/:/app/src/mnt/public/
     dns:
       - 8.8.8.8
       - 8.8.4.4

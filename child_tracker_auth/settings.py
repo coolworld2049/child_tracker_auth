@@ -47,9 +47,13 @@ class Settings(BaseSettings):
 
     sms_provider_login: str
     sms_provider_password: str
-
     public_dir_path: str = (
-        pathlib.Path(__file__).parent.parent.joinpath("public/files").__str__()
+        pathlib.Path(__file__).parent.parent.joinpath("public").__str__()
+    )
+    mnt_public_path: str = pathlib.Path(__file__).parent.parent.joinpath(
+        "mnt/public").__str__()
+    public_upload_media_dir_path: str = (
+        pathlib.Path(__file__).parent.parent.joinpath("public/upload/media").__str__()
     )
     storage_endpoint_url: str
     storage_region: str
