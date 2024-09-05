@@ -13,6 +13,7 @@ from child_tracker_auth.db.base import (
     FileTable,
     SettingsTable,
     engine,
+    MediaTable,
 )
 from child_tracker_auth.db.enums import get_enum_values
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
@@ -24,6 +25,7 @@ PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
 PydanticLog = sqlalchemy_to_pydantic(LogTable)
 
 PydanticFile = sqlalchemy_to_pydantic(FileTable)
+PydanticMedia = sqlalchemy_to_pydantic(MediaTable)
 PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
 
 log_type_values = get_enum_values(
