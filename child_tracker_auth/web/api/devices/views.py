@@ -11,7 +11,7 @@ from fastapi import APIRouter, UploadFile
 from fastapi.params import Depends, Query, File
 from loguru import logger
 from mimesis import Internet
-from sqlalchemy import select, and_, text, delete, or_
+from sqlalchemy import select, and_, text, delete, or_, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -512,6 +512,36 @@ async def get_conversation(
     return conversation
 
 
+async def _update_device(db: AsyncSession, id: int, model: schemas.PydanticDevice):
+    q = select(DeviceTable).where(DeviceTable.id == id)
+    rq = await db.execute(q)
+    device = rq.scalars().first()
+    if not device:
+        raise HTTPException(status_code=status.HTTP_200_OK, detail="Not found")
+    try:
+        q_update = update(DeviceTable).where(DeviceTable.id == id).values(
+            **model.model_dump(exclude_unset=True,
+                               exclude={"id", "wcSection_id", "member_id"}))
+        await db.execute(q_update)
+        await db.commit()
+        await db.refresh(device)
+        return device
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+
+
+@router.put("/{id}", response_model=schemas.PydanticDevice)
+async def update_device(
+    id: int,
+    data: schemas.PydanticDeviceUpdate,
+    db: AsyncSession = Depends(get_db_session),
+):
+    device = await _update_device(db=db, model=data, id=id)
+    return device
+
+
 @router.delete("/{id}")
 async def delete_device(
     id: int,
@@ -520,6 +550,8 @@ async def delete_device(
     q = select(DeviceTable).where(DeviceTable.id == id)
     rq = await db.execute(q)
     device = rq.scalars().first()
+    if not device:
+        raise HTTPException(status_code=status.HTTP_200_OK, detail="Not found")
     bucket_name = DeviceTable.__name__
     with suppress(Exception):
         async with create_storage_client() as storage_client:
