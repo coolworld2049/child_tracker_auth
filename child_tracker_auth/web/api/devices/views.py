@@ -93,7 +93,7 @@ async def get_device_files(
     if section_id:
         and_f.append(FileTable.section_id == section_id)
     if mime_type:
-        and_f.append(FileTable.type == mime_type)
+        and_f.append(FileTable.type.ilike(f'%{mime_type}%'))
     q = select(FileTable).filter(and_(*and_f))
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
@@ -158,7 +158,7 @@ async def get_device_media(
 ):
     and_f = []
     if mime_type:
-        and_f.append(MediaTable.type == mime_type)
+        and_f.append(MediaTable.type.ilike(f'%{mime_type}%'))
     q = select(MediaTable).filter(and_(*and_f))
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
