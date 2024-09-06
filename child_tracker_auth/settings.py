@@ -50,8 +50,9 @@ class Settings(BaseSettings):
     public_dir_path: str = (
         pathlib.Path(__file__).parent.parent.joinpath("public").__str__()
     )
-    mnt_public_path: str = pathlib.Path(__file__).parent.parent.joinpath(
-        "mnt/public").__str__()
+    mnt_public_path: str = (
+        pathlib.Path(__file__).parent.parent.joinpath("mnt/public").__str__()
+    )
     public_upload_media_dir_path: str = (
         pathlib.Path(__file__).parent.parent.joinpath("public/upload/media").__str__()
     )
