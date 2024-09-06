@@ -4,7 +4,7 @@ import typing
 from datetime import datetime, timedelta
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
+from pydantic import (BaseModel, EmailStr, ConfigDict, Field, computed_field)
 
 from child_tracker_auth.db.base import (
     MemberTable,
@@ -35,6 +35,10 @@ log_type_values = get_enum_values(
 sms_type_values = list(filter(lambda c: "sms" in c, log_type_values))
 
 LogMessageEnum = enum.Enum("LogMessageEnum", [(x, x) for x in sms_type_values])
+
+
+class PydanticDeviceUpdate(BaseModel):
+    name: str
 
 
 class ResponseModel(BaseModel):
