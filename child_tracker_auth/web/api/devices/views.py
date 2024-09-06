@@ -20,7 +20,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse
 
 from child_tracker_auth import schemas
-from child_tracker_auth.db.base import (LogTable, FileTable, DeviceTable, MediaTable)
+from child_tracker_auth.db.base import LogTable, FileTable, DeviceTable, MediaTable
 from child_tracker_auth.db.dependencies import get_db_session
 from child_tracker_auth.schemas import log_type_values
 from child_tracker_auth.security.oauth2 import get_current_member
@@ -76,7 +76,7 @@ async def get_files_mime_types(
     return r
 
 
-@router.get("/files", response_model=list[schemas.PydanticFile])
+@router.get("/files", response_model=list[schemas.PydanticFileRespone])
 async def get_device_files(
     device_id: int | None = None,
     section_id: int | None = None,
@@ -93,15 +93,20 @@ async def get_device_files(
     if section_id:
         and_f.append(FileTable.section_id == section_id)
     if mime_type:
-        and_f.append(FileTable.type.ilike(f'%{mime_type}%'))
+        and_f.append(FileTable.type.ilike(f"%{mime_type}%"))
     q = select(FileTable).filter(and_(*and_f))
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
     if len(r) < 1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    logs = [schemas.PydanticFile(**x.__dict__) for x in r]
-    return logs
+    files = [
+        schemas.PydanticFileRespone(
+            **x.__dict__, url=f"https://child-tracker.uz{x.path}"
+        )
+        for x in r
+    ]
+    return files
 
 
 @router.get("/files/{id}", response_class=FileResponse)
@@ -117,9 +122,7 @@ async def download_device_files(
     db_file = schemas.PydanticFile(**r.__dict__)
     file_path = pathlib.Path(settings.public_dir_path)
     if not str(db_file.path).startswith("/mnt"):
-        file_path = file_path.joinpath(
-            str(db_file.path).lstrip("/")
-        )
+        file_path = file_path.joinpath(str(db_file.path).lstrip("/"))
     else:
         parts = pathlib.Path(db_file.path).parts
         for i, part in enumerate(parts):
@@ -131,8 +134,9 @@ async def download_device_files(
     if db_file.type == "report":
         media_type = "text/html"
     if not file_path.exists():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="File not found")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="File not found"
+        )
     return FileResponse(file_path, media_type=media_type, filename=db_file.name)
 
 
@@ -149,7 +153,7 @@ async def get_media_mime_types(
     return r
 
 
-@router.get("/media", response_model=list[schemas.PydanticMedia])
+@router.get("/media", response_model=list[schemas.PydanticMediaRespone])
 async def get_device_media(
     offset: int = 0,
     limit: int = 100,
@@ -158,14 +162,19 @@ async def get_device_media(
 ):
     and_f = []
     if mime_type:
-        and_f.append(MediaTable.type.ilike(f'%{mime_type}%'))
+        and_f.append(MediaTable.type.ilike(f"%{mime_type}%"))
     q = select(MediaTable).filter(and_(*and_f))
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
     if len(r) < 1:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    media = [schemas.PydanticMedia(**x.__dict__) for x in r]
+    media = [
+        schemas.PydanticMediaRespone(
+            **x.__dict__, url=f"https://child-tracker.uz{x.path}"
+        )
+        for x in r
+    ]
     return media
 
 
@@ -181,12 +190,15 @@ async def download_device_files(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     db_media_file = schemas.PydanticMedia(**r.__dict__)
     file_path = pathlib.Path(settings.public_dir_path).joinpath(
-        str(db_media_file.path).lstrip("/"))
+        str(db_media_file.path).lstrip("/")
+    )
     if not file_path.exists():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="File not found")
-    return FileResponse(file_path, media_type=db_media_file.type,
-                        filename=db_media_file.name)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="File not found"
+        )
+    return FileResponse(
+        file_path, media_type=db_media_file.type, filename=db_media_file.name
+    )
 
 
 @router.get(

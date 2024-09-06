@@ -156,3 +156,11 @@ class ResonseModel(BaseModel):
 class Conversation(BaseModel):
     phone_info: Phone
     messages: dict[str, list[DeviceMessage]]
+
+
+class PydanticFileRespone(PydanticFile):
+    url: str
+
+
+class PydanticMediaRespone(PydanticMedia):
+    url: str
