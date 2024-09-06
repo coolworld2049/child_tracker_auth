@@ -11,7 +11,7 @@ from fastapi import APIRouter, UploadFile
 from fastapi.params import Depends, Query, File
 from loguru import logger
 from mimesis import Internet
-from sqlalchemy import select, and_, text, delete
+from sqlalchemy import select, and_, text, delete, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -84,17 +84,18 @@ async def get_device_files(
     limit: int = 100,
     date_from: date = date_from_default,
     date_to: date = date_to_default,
-    mime_type: str | None = None,
+    mime_type: list[str] | None = Query(None),
     db: AsyncSession = Depends(get_db_session),
 ):
     and_f = [FileTable.time.between(date_from, date_to)]
+    or_f = []
     if device_id:
         and_f.append(FileTable.device_id == device_id)
     if section_id:
         and_f.append(FileTable.section_id == section_id)
     if mime_type:
-        and_f.append(FileTable.type.ilike(f"%{mime_type}%"))
-    q = select(FileTable).filter(and_(*and_f))
+        or_f.extend([FileTable.type.ilike(f"%{x}%") for x in mime_type])
+    q = select(FileTable).filter(and_(*and_f), or_(*or_f))
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
@@ -157,13 +158,14 @@ async def get_media_mime_types(
 async def get_device_media(
     offset: int = 0,
     limit: int = 100,
-    mime_type: str | None = None,
+    mime_type: list[str] | None = Query(None),
     db: AsyncSession = Depends(get_db_session),
 ):
     and_f = []
+    or_f = []
     if mime_type:
-        and_f.append(MediaTable.type.ilike(f"%{mime_type}%"))
-    q = select(MediaTable).filter(and_(*and_f))
+        or_f.extend([MediaTable.type.ilike(f"%{x}%") for x in mime_type])
+    q = select(MediaTable).filter(and_(*and_f), or_(*or_f))
     q = q.offset(offset).limit(limit)
     rq = await db.execute(q)
     r = rq.scalars().all()
