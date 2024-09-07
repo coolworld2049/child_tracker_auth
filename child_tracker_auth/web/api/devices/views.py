@@ -423,10 +423,15 @@ async def get_device_messages(
     limit: int = 100,
     db: AsyncSession = Depends(get_db_session),
 ):
+    log_type_f = []
+    if len(message_type) > 0 and message_type[0].value == "all":
+        log_type_f.extend(["in_sms", "out_sms"])
+    else:
+        log_type_f.extend([x.value for x in message_type])
     q = select(LogTable).filter(
         and_(
             LogTable.device_id == id,
-            LogTable.log_type.in_([x.value for x in message_type]),
+            LogTable.log_type.in_(log_type_f),
         )
     )
     q = q.offset(offset).limit(limit)

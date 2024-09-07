@@ -34,7 +34,9 @@ log_type_values = get_enum_values(
 
 sms_type_values = list(filter(lambda c: "sms" in c, log_type_values))
 
-LogMessageEnum = enum.Enum("LogMessageEnum", [(x, x) for x in sms_type_values])
+log_message_enum_values = [(x, x) for x in sms_type_values]
+log_message_enum_values.append(("all", "all"))
+LogMessageEnum = enum.Enum("LogMessageEnum", log_message_enum_values)
 
 
 class PydanticDeviceUpdate(BaseModel):
