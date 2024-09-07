@@ -100,7 +100,7 @@ async def get_device_files(
     rq = await db.execute(q)
     r = rq.scalars().all()
     if len(r) < 1:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        return []
     files = [
         schemas.PydanticFileRespone(
             **x.__dict__, url=f"https://child-tracker.uz{x.path}"
@@ -170,7 +170,7 @@ async def get_device_media(
     rq = await db.execute(q)
     r = rq.scalars().all()
     if len(r) < 1:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        return []
     media = [
         schemas.PydanticMediaRespone(
             **x.__dict__, url=f"https://child-tracker.uz{x.path}"
@@ -519,9 +519,15 @@ async def _update_device(db: AsyncSession, id: int, model: schemas.PydanticDevic
     if not device:
         raise HTTPException(status_code=status.HTTP_200_OK, detail="Not found")
     try:
-        q_update = update(DeviceTable).where(DeviceTable.id == id).values(
-            **model.model_dump(exclude_unset=True,
-                               exclude={"id", "wcSection_id", "member_id"}))
+        q_update = (
+            update(DeviceTable)
+            .where(DeviceTable.id == id)
+            .values(
+                **model.model_dump(
+                    exclude_unset=True, exclude={"id", "wcSection_id", "member_id"}
+                )
+            )
+        )
         await db.execute(q_update)
         await db.commit()
         await db.refresh(device)

@@ -4,7 +4,7 @@ import typing
 from datetime import datetime, timedelta
 from typing import Literal
 
-from pydantic import (BaseModel, EmailStr, ConfigDict, Field, computed_field)
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
 
 from child_tracker_auth.db.base import (
     MemberTable,
