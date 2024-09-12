@@ -2,8 +2,11 @@ import enum
 import random
 import typing
 from datetime import datetime, timedelta
+from io import BytesIO
 from typing import Literal
 
+import numpy as np
+from loguru import logger
 from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
 
 from child_tracker_auth.db.base import (
@@ -27,7 +30,6 @@ PydanticLog = sqlalchemy_to_pydantic(LogTable)
 PydanticFile = sqlalchemy_to_pydantic(FileTable)
 PydanticMedia = sqlalchemy_to_pydantic(MediaTable)
 PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
-
 log_type_values = get_enum_values(
     engine=engine, table_name="logs", column_name="log_type"
 )
@@ -37,6 +39,50 @@ sms_type_values = list(filter(lambda c: "sms" in c, log_type_values))
 log_message_enum_values = [(x, x) for x in sms_type_values]
 log_message_enum_values.append(("all", "all"))
 LogMessageEnum = enum.Enum("LogMessageEnum", log_message_enum_values)
+
+
+class DataType(enum.Enum):
+    string = str
+    number = int
+    boolean = bool
+
+
+def convert_value_type(value: str) -> np.ndarray:
+    try:
+        if value == "":
+            return value
+        f = BytesIO("\n".join([value]).encode())
+        arr = np.genfromtxt(f, dtype=None, encoding="utf-8", delimiter="\n")
+        return arr
+    except Exception as e:
+        logger.error(
+            (
+                value,
+                e,
+            )
+        )
+        return None
+
+
+class PydanticSettingsWithTypeBase(BaseModel):
+    @computed_field
+    @property
+    def typed_value(self) -> typing.Any:
+        v = convert_value_type(self.value)
+        if v is None:
+            return self.value
+        elif v == "":
+            return self.value
+        return v.item()
+
+
+class PydanticSettingsWithTypeKey(BaseModel):
+    key: str
+    data_type: str | None = None
+
+
+class PydanticSettingsWithType(PydanticSettings, PydanticSettingsWithTypeBase):
+    pass
 
 
 class PydanticDeviceUpdate(BaseModel):
@@ -91,15 +137,19 @@ class Phone(BaseModel):
     @computed_field
     @property
     def phone(self) -> str:
-        spl = self.name.split(" ")
+        d = ","
+        spl = self.name.split(d)
         if len(spl) < 1:
+            if not spl[0].replace("+", "").isnumeric():
+                return None
             return self.name
         return spl[0].strip()
 
     @computed_field
     @property
     def sub(self) -> str:
-        spl = self.name.split(" ")
+        d = ","
+        spl = self.name.split(d)
         if len(spl) < 2:
             return None
         return spl[1].strip()

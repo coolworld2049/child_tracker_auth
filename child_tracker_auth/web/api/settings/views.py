@@ -24,41 +24,64 @@ router = APIRouter(
 )
 
 
-@router.get("/keys", response_model=list[str])
+@router.get("/keys", response_model=list[schemas.PydanticSettingsWithTypeKey])
 async def get_settings_keys(
     object_type: Literal["member", "section"],
     db: AsyncSession = Depends(get_db_session),
 ):
-    q = select(SettingsTable.key.distinct()).filter(
+    q = select(SettingsTable.key.distinct().label("key"), SettingsTable.value).filter(
         and_(
             SettingsTable.object_type == object_type,
         )
     )
     r = await db.execute(q)
-    keys = r.scalars().all()
+    mp = r.mappings().all()
+    unique_keys: set[str] = set()
+    keys: list[schemas.PydanticSettingsWithTypeKey] = []
+    for x in mp:
+        if x["key"] in unique_keys:
+            continue
+        value = schemas.convert_value_type(x["value"])
+        data_type = None
+        if value is not None:
+            if value == "":
+                data_type = "str"
+            else:
+                data_type = (
+                    str(type(value.item())).replace("<class '", "").replace("'>", "")
+                )
+        keys.append(
+            schemas.PydanticSettingsWithTypeKey(key=x["key"], data_type=data_type)
+        )
+        unique_keys.add(x["key"])
+
     return keys
 
 
-@router.get("/", response_model=list[schemas.PydanticSettings])
+@router.get("/", response_model=list[schemas.PydanticSettingsWithType])
 async def get_settings(
     object_id: int,
     object_type: Literal["member", "section"],
     key: str | None = Query(None, description="Full text search"),
     db: AsyncSession = Depends(get_db_session),
 ):
+    and_f = []
+    if key:
+        and_f.append(SettingsTable.key.ilike(f"%{key}%"))
     q = select(SettingsTable).filter(
         and_(
             SettingsTable.object_id == object_id,
             SettingsTable.object_type == object_type,
-            SettingsTable.key.ilike(f"%{key}%") if key else None,
+            *and_f,
         )
     )
     r = await db.execute(q)
-    settings = [schemas.PydanticSettings(**x.__dict__) for x in r.scalars().all()]
+    rq = r.scalars().all()
+    settings = [schemas.PydanticSettingsWithType(**x.__dict__) for x in rq]
     return settings
 
 
-@router.put("/", response_model=schemas.PydanticSettings)
+@router.put("/", response_model=schemas.PydanticSettingsWithType)
 async def update_setting(
     id: int,
     value: str,
@@ -78,4 +101,4 @@ async def update_setting(
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
 
-    return schemas.PydanticSettings(**setting.__dict__)
+    return schemas.PydanticSettingsWithType(**setting.__dict__)
