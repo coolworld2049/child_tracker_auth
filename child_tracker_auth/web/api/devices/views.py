@@ -313,6 +313,15 @@ ORDER BY
     return stats
 
 
+async def get_devices_avatar(db: AsyncSession, ids: set[int]):
+    q = select(DeviceTable.id, DeviceTable.avatar_url).filter(
+        DeviceTable.id.in_(tuple(ids))
+    )
+    rq = await db.execute(q)
+    r = [dict(x) for x in rq.mappings().all()]
+    return r
+
+
 @router.get(
     "/{id}/messages",
     response_model=dict[str, list[schemas.DeviceMessage]],
@@ -322,6 +331,7 @@ async def get_device_messages(
     message_type: Annotated[
         list[schemas.LogMessageEnum], Query(enum=schemas.sms_type_values)
     ],
+    message_text_limit: int = 10,
     offset: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db_session),
@@ -347,12 +357,22 @@ async def get_device_messages(
     df_by_date = (
         df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
     )
+    devices_avatar = await get_devices_avatar(db=db, ids=set(df["device_id"].tolist()))
     messages = {
         k.__str__(): [
             schemas.DeviceMessage(
-                avatar=internet.stock_image_url(keywords=["people"]),
+                avatar="".join(
+                    list(
+                        [
+                            x["avatar_url"]
+                            for x in filter(
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
+                        ]
+                    )
+                ),
                 name=vv["name"],
-                text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
+                text=" ".join(str(vv["title"]).split(" ")[:message_text_limit]) + "...",
                 time=":".join(str(vv["time"]).split(":")[:2]),
                 message_type=vv["log_type"],
             )
@@ -365,7 +385,7 @@ async def get_device_messages(
 
 @router.get(
     "/conversation/{name}",
-    response_model=schemas.Conversation,
+    response_model=schemas.Conversation | dict,
     description="`name` - Full text search",
 )
 async def get_conversation(
@@ -374,13 +394,20 @@ async def get_conversation(
     message_type: Annotated[
         list[schemas.LogMessageEnum], Query(enum=schemas.sms_type_values)
     ],
+    message_text_limit: int = 10,
     offset: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db_session),
 ):
+    log_type_f = []
+    if len(message_type) > 0 and message_type[0].value == "all":
+        log_type_f.extend(["in_sms", "out_sms"])
+    else:
+        log_type_f.extend([x.value for x in message_type])
+
     q = select(LogTable).filter(
         and_(
-            LogTable.log_type.in_([x.value for x in message_type]),
+            LogTable.log_type.in_(log_type_f),
             LogTable.name.like(f"%{name}%"),
         )
     )
@@ -389,16 +416,26 @@ async def get_conversation(
     r = rq.scalars().all()
     df = pd.DataFrame([schemas.PydanticLog(**x.__dict__).model_dump() for x in r])
     if len(df) < 1:
-        return {"": []}
+        return {}
     df_by_date = (
         df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
     )
+    devices_avatar = await get_devices_avatar(db=db, ids=set(df["device_id"].tolist()))
     messages = {
         k.__str__(): [
             schemas.DeviceMessage(
-                avatar=internet.stock_image_url(keywords=["people"]),
+                avatar="".join(
+                    list(
+                        [
+                            x["avatar_url"]
+                            for x in filter(
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
+                        ]
+                    )
+                ),
                 name=vv["name"],
-                text=" ".join(str(vv["title"]).split(" ")[:3]) + "...",
+                text=" ".join(str(vv["title"]).split(" ")[:message_text_limit]) + "...",
                 time=":".join(str(vv["time"]).split(":")[:2]),
                 message_type=vv["log_type"],
             )
