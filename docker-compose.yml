@@ -12,8 +12,8 @@ services:
       - .env.prod
     environment:
       CHILD_TRACKER_AUTH_HOST: 0.0.0.0
-      CHILD_TRACKER_AUTH_DB_HOST: 10.88.0.3
-      CHILD_TRACKER_AUTH_DB_PORT: 3306
+      CHILD_TRACKER_AUTH_DB_HOST: ${CHILD_TRACKER_AUTH_DB_HOST:-10.88.0.2}
+      CHILD_TRACKER_AUTH_DB_PORT: ${CHILD_TRACKER_AUTH_DB_PORT:-3306}
     volumes:
       - /home/docker/staff/data/var/www/vhosts/kidl/public/:/app/src/public/
       - /mnt/data/var/www/vhosts/kidl/public/:/app/src/mnt/public/
