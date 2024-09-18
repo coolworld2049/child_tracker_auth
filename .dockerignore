@@ -143,3 +143,4 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 !/scripts/upload_dump.sql_here.md
+!/dev/

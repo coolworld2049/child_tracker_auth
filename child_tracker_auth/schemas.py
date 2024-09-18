@@ -206,6 +206,22 @@ class DeviceMessage(BaseModel):
     message_type: str
 
 
+class DeviceInternetActivitySite(BaseModel):
+    visit_count: int
+    duration: int
+
+
+class DeviceInternetActivityAggData(BaseModel):
+    total_sites_count: int
+    total_sites_visit: int
+    total_duration: int
+
+
+class DeviceInternetActivity(BaseModel):
+    usage_data: dict[str, DeviceInternetActivitySite]
+    agg_data: DeviceInternetActivityAggData
+
+
 class ResonseModel(BaseModel):
     data: list[typing.Any] = []
 
