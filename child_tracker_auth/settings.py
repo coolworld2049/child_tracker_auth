@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     storage_access_key: str
     storage_secret_key: str
 
+    tz: str
+
     @property
     def db_url(self) -> URL:
         """

@@ -368,8 +368,8 @@ async def get_device_messages(
                         [
                             x["avatar_url"]
                             for x in filter(
-                            lambda c: c["id"] == vv["device_id"], devices_avatar
-                        )
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
                         ]
                     )
                 ),
@@ -431,8 +431,8 @@ async def get_conversation(
                         [
                             x["avatar_url"]
                             for x in filter(
-                            lambda c: c["id"] == vv["device_id"], devices_avatar
-                        )
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
                         ]
                     )
                 ),

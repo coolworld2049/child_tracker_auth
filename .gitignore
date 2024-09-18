@@ -142,3 +142,4 @@ dmypy.json
 cython_debug/
 !/scripts/dump.sql
 !/query/
+!/dev/

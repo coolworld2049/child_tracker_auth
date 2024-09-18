@@ -3,7 +3,7 @@ from typing import Literal
 from fastapi import APIRouter
 from fastapi.params import Depends, Query
 from loguru import logger
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -79,6 +79,50 @@ async def get_settings(
     rq = r.scalars().all()
     settings = [schemas.PydanticSettingsWithType(**x.__dict__) for x in rq]
     return settings
+
+
+@router.post("/upsert", response_model=schemas.PydanticSettingsWithType)
+async def upsert_setting(
+    key: str,
+    value: str,
+    object_id: int,
+    object_type: str = Query("app", enum=["member", "section"]),
+    group: str = Query("app", enum=["app", "other"]),
+    db: AsyncSession = Depends(get_db_session),
+):
+    q = select(SettingsTable).filter(
+        and_(
+            SettingsTable.key == key,
+            SettingsTable.object_id == object_id,
+            SettingsTable.object_type == object_type,
+            SettingsTable.group == group,
+        )
+    )
+    r = await db.execute(q)
+    setting = r.scalars().first()
+    date_now = func.now()
+    if not setting:
+        setting = SettingsTable(
+            object_id=object_id,
+            object_type=object_type,
+            group=group,
+            key=key,
+            value=value,
+            created_at=date_now,
+        )
+    else:
+        setting.value = value
+        setting.updated_at = func.now()
+    try:
+        db.add(setting)
+        await db.commit()
+        await db.refresh(setting)
+    except SQLAlchemyError as e:
+        logger.error(e)
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
+
+    return schemas.PydanticSettingsWithType(**setting.__dict__)
 
 
 @router.put("/", response_model=schemas.PydanticSettingsWithType)
