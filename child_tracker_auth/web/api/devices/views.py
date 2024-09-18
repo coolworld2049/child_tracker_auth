@@ -220,7 +220,8 @@ limit :limit OFFSET :offset
 
 @router.get(
     "/{id}/stat",
-    response_model=dict[str, list[schemas.DeviceUsage]],
+    response_model=dict[str, list[schemas.DeviceUsage]]
+    | schemas.DeviceInternetActivity,
     description="`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated",
 )
 async def get_device_statistics(
@@ -284,34 +285,73 @@ ORDER BY
     if len(df) < 1:
         return {"": []}
 
-    df_grouped = (
-        df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
-    )
-
     stats = {}
-    for k, v in df_grouped.items():
-        device_usage_list = []
-        for v2 in v:
-            usage_data_json = json.loads(v2["usage_data_json"])
-            sorted_usage_data = sorted(usage_data_json, key=lambda c: c["week_day"])
 
-            durations = list(
-                map(
-                    lambda c: c["duration_timestamp"],
-                    sorted_usage_data,
+    if log_type in ["url", "search_query"]:
+        df_grouped = (
+            df.groupby("name").apply(lambda g: g.to_dict(orient="records")).to_dict()
+        )
+        site_ratings = {}
+        total_sites_count = 0
+        total_sites_visit = 0
+        total_duration = 0
+        for k, v in df_grouped.items():
+            for v2 in v:
+                usage_data_json = json.loads(v2["usage_data_json"])
+                sorted_usage_data = sorted(usage_data_json, key=lambda c: c["week_day"])
+                visit_count = len(usage_data_json)
+
+                durations = list(
+                    map(
+                        lambda c: c["duration_timestamp"],
+                        sorted_usage_data,
+                    )
                 )
-            )
-            avg_usage_seconds = sum(durations) // len(durations)
-            today_exp = avg_usage_seconds * randint(2, 4)
-            device_usage = schemas.DeviceUsage(
-                name=v2["name"],
-                usage_data=[schemas.DeviceUsageData(**v3) for v3 in sorted_usage_data],
-                agg_data=schemas.DeviceUsageAggregatedData(
-                    avg=avg_usage_seconds, today_exp=today_exp
-                ),
-            )
-            device_usage_list.append(device_usage)
-        stats[k.__str__()] = device_usage_list
+                duration = round(sum(durations), 0)
+                total_sites_visit += visit_count
+                total_duration += duration
+                total_sites_count += 1
+                site_ratings[k.__str__()] = schemas.DeviceInternetActivitySite(
+                    visit_count=visit_count,
+                    duration=duration,
+                )
+        agg_data = schemas.DeviceInternetActivityAggData(
+            total_sites_count=total_sites_count,
+            total_sites_visit=total_sites_visit,
+            total_duration=total_duration,
+        )
+        stats = schemas.DeviceInternetActivity(
+            usage_data=site_ratings, agg_data=agg_data
+        )
+    else:
+        df_grouped = (
+            df.groupby("date").apply(lambda g: g.to_dict(orient="records")).to_dict()
+        )
+        for k, v in df_grouped.items():
+            device_usage_list = []
+            for v2 in v:
+                usage_data_json = json.loads(v2["usage_data_json"])
+                sorted_usage_data = sorted(usage_data_json, key=lambda c: c["week_day"])
+
+                durations = list(
+                    map(
+                        lambda c: c["duration_timestamp"],
+                        sorted_usage_data,
+                    )
+                )
+                avg_usage_seconds = sum(durations) // len(durations)
+                today_exp = avg_usage_seconds * randint(2, 4)
+                device_usage = schemas.DeviceUsage(
+                    name=v2["name"],
+                    usage_data=[
+                        schemas.DeviceUsageData(**v3) for v3 in sorted_usage_data
+                    ],
+                    agg_data=schemas.DeviceUsageAggregatedData(
+                        avg=avg_usage_seconds, today_exp=today_exp
+                    ),
+                )
+                device_usage_list.append(device_usage)
+            stats[k.__str__()] = device_usage_list
     return stats
 
 
