@@ -225,6 +225,7 @@ limit :limit OFFSET :offset
 )
 async def get_device_statistics(
     id: int,
+    log_type: str = Query(schemas.LogTypeEnum.app.value, enum=schemas.log_type_values),
     date_from: date = date_from_default,
     date_to: date = date_to_default,
     app_name: str | None = None,
@@ -252,7 +253,7 @@ FROM (
     FROM
         kidl.logs l
     WHERE
-        `log_type` = 'app'
+        `log_type` = :log_type
         AND `device_id` = :device_id
         AND name != ""
         AND `date` BETWEEN :date_from AND :date_to
@@ -273,6 +274,7 @@ ORDER BY
             "device_id": id,
             "date_from": date_from.__str__(),
             "date_to": date_to.__str__(),
+            "log_type": log_type,
         },
     )
     r = rq.mappings().all()
@@ -366,8 +368,8 @@ async def get_device_messages(
                         [
                             x["avatar_url"]
                             for x in filter(
-                                lambda c: c["id"] == vv["device_id"], devices_avatar
-                            )
+                            lambda c: c["id"] == vv["device_id"], devices_avatar
+                        )
                         ]
                     )
                 ),
@@ -429,8 +431,8 @@ async def get_conversation(
                         [
                             x["avatar_url"]
                             for x in filter(
-                                lambda c: c["id"] == vv["device_id"], devices_avatar
-                            )
+                            lambda c: c["id"] == vv["device_id"], devices_avatar
+                        )
                         ]
                     )
                 ),
