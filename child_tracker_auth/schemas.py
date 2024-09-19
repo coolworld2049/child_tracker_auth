@@ -7,7 +7,8 @@ from typing import Literal
 
 import numpy as np
 from loguru import logger
-from pydantic import BaseModel, EmailStr, ConfigDict, Field, computed_field
+from pydantic import (BaseModel, ConfigDict, Field, computed_field,
+                      field_validator)
 
 from child_tracker_auth.db.base import (
     MemberTable,
@@ -95,11 +96,16 @@ class ResponseModel(BaseModel):
 
 
 class PydanticMemberCreate(BaseModel):
-    email: EmailStr
     phone: str
     name: str
     role: Literal["member", "admin", "editor", "manager"] = "member"
     active: int = Field(0, ge=0, le=1)
+
+    @field_validator("phone")
+    def phone_v(cls, v):
+        if not str(v).startswith("+"):
+            raise ValueError(f"The phone number must start with '+'")
+        return v
 
 
 class RegistrationUserRepsonse(BaseModel):
