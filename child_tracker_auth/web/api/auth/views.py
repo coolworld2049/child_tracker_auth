@@ -1,5 +1,6 @@
 import random
 from datetime import timedelta
+from uuid import uuid4
 
 from fastapi import APIRouter
 from fastapi import Depends, HTTPException, status
@@ -46,7 +47,6 @@ async def register(
     check_query = select(MemberTable).filter(
         or_(
             MemberTable.phone == user_credentials.phone,
-            MemberTable.email == user_credentials.email,
         )
     )
     check_result = await db.execute(check_query)
@@ -60,7 +60,7 @@ async def register(
     code = random.randint(1000, 9999)
 
     new_user = MemberTable(
-        email=user_credentials.email,
+        email=f"{uuid4().__str__()}@gmail.com",
         name=user_credentials.name,
         role=user_credentials.role,
         active=user_credentials.active,

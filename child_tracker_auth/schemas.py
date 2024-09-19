@@ -95,7 +95,6 @@ class ResponseModel(BaseModel):
 
 
 class PydanticMemberCreate(BaseModel):
-    email: EmailStr
     phone: str
     name: str
     role: Literal["member", "admin", "editor", "manager"] = "member"
