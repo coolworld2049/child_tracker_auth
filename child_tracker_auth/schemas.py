@@ -7,8 +7,7 @@ from typing import Literal
 
 import numpy as np
 from loguru import logger
-from pydantic import (BaseModel, ConfigDict, Field, computed_field,
-                      field_validator)
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from child_tracker_auth.db.base import (
     MemberTable,

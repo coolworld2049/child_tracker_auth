@@ -63,6 +63,10 @@ class Settings(BaseSettings):
 
     tz: str
 
+    google_play_member_name: str = "dujEHaPLYzpnhkQDSKPe3tE7K8G6cgAN"
+    google_play_member_phone: str = "+19999999999"
+    google_play_member_code: int = 4985
+
     @property
     def db_url(self) -> URL:
         """
