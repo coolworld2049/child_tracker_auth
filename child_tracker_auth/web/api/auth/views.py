@@ -78,7 +78,8 @@ async def register(
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.__str__())
 
-    send_sms_code(phone=new_user.phone, code=code)
+    if new_user.name != settings.google_play_member_name:
+        send_sms_code(phone=new_user.phone, code=code)
 
     return schemas.RegistrationUserRepsonse(
         message="User registration successful. Please verify your phone number",
@@ -127,6 +128,15 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    if (
+        user.name == settings.google_play_member_name
+        and code == settings.google_play_member_code
+        and phone == settings.google_play_member_phone
+    ):
+        user.code = code
+        logger.warning("Granted access to Google Play Service for a fake account")
+
     if user.code != code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
