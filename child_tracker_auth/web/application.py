@@ -1,3 +1,8 @@
+from cashews.contrib.fastapi import (
+    CacheDeleteMiddleware,
+    CacheRequestControlMiddleware,
+    CacheEtagMiddleware,
+)
 from fastapi import FastAPI
 from fastapi.responses import UJSONResponse
 
@@ -26,4 +31,7 @@ def get_app() -> FastAPI:
     # Main router for the API.
     app.include_router(router=api_router, prefix="/api")
     app.add_middleware(HTTPErrorMiddleware)
+    app.add_middleware(CacheDeleteMiddleware)
+    app.add_middleware(CacheEtagMiddleware)
+    app.add_middleware(CacheRequestControlMiddleware)
     return app

@@ -14,6 +14,7 @@ services:
         condition: service_healthy
     volumes:
       - ./public/files:/app/src/public/files
+      - /tmp/child_tracker_auth_cache:/tmp/child_tracker_auth_cache
     environment:
       CHILD_TRACKER_AUTH_HOST: 0.0.0.0
       CHILD_TRACKER_AUTH_DB_HOST: child_tracker_auth-db
