@@ -1,9 +1,11 @@
 import enum
+import json
 import pathlib
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Literal
 
+from cashews import cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from yarl import URL
 
@@ -67,13 +69,10 @@ class Settings(BaseSettings):
     google_play_member_phone: str = "+19999999999"
     google_play_member_code: int = 4985
 
+    diskcache_directory: str = "/tmp/child_tracker_auth_cache"
+
     @property
     def db_url(self) -> URL:
-        """
-        Assemble database URL from settings.
-
-        :return: database URL.
-        """
         return URL.build(
             scheme="mysql+aiomysql",
             host=self.db_host,
@@ -82,6 +81,12 @@ class Settings(BaseSettings):
             password=self.db_pass,
             path=f"/{self.db_base}",
         )
+
+    @property
+    def regions(self) -> list[dict[str, str]]:
+        data = pathlib.Path(__file__).parent.joinpath("data/regions.json")
+        regions = json.loads(data.read_bytes())
+        return regions
 
     model_config = SettingsConfigDict(
         env_file="../.env",
@@ -92,3 +97,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+Gb = 1073741824
+cache.setup(
+    f"disk://?directory={settings.diskcache_directory}", size_limit=3 * Gb, shards=12
+)

@@ -17,6 +17,7 @@ services:
     volumes:
       - /home/docker/staff/data/var/www/vhosts/kidl/public/:/app/src/public/
       - /mnt/data/var/www/vhosts/kidl/public/:/app/src/mnt/public/
+      - /tmp/child_tracker_auth_cache:/tmp/child_tracker_auth_cache
     dns:
       - 8.8.8.8
       - 8.8.4.4

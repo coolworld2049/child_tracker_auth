@@ -99,6 +99,7 @@ class PydanticMemberCreate(BaseModel):
     name: str
     role: Literal["member", "admin", "editor", "manager"] = "member"
     active: int = Field(0, ge=0, le=1)
+    region: str | None = None
 
     @field_validator("phone")
     def phone_v(cls, v):

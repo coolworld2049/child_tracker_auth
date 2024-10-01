@@ -2,6 +2,7 @@ import random
 from datetime import timedelta
 from uuid import uuid4
 
+from cashews import cache
 from fastapi import APIRouter
 from fastapi import Depends, HTTPException, status
 from loguru import logger
@@ -34,6 +35,13 @@ def send_sms_code(phone: str, code: int):
         )
 
 
+sms_send_rate_limit = {"limit": 50, "period": "1s", "ttl": "30s"}
+
+
+@cache.rate_limit(
+    **sms_send_rate_limit,
+    key="schemas.PydanticMemberCreate.phone:{user_credentials.phone}",
+)
 @router.post(
     "/register",
     status_code=status.HTTP_201_CREATED,
@@ -68,6 +76,7 @@ async def register(
         password_pbkdf_hash="",
         phone=user_credentials.phone,
         code=code,
+        region=user_credentials.region
     )
     try:
         db.add(new_user)
@@ -87,6 +96,9 @@ async def register(
     )
 
 
+@cache.rate_limit(
+    **sms_send_rate_limit, key="schemas.LoginModel.phone:{login_data.phone}"
+)
 @router.post("/login", response_model=schemas.ResponseModel)
 async def login(
     login_data: schemas.LoginModel,
@@ -115,7 +127,9 @@ async def login(
 
     send_sms_code(phone=user.phone, code=code)
 
-    return schemas.ResponseModel(message="Verification code sent successfully")
+    return schemas.ResponseModel(
+        message=f"The confirmation code was successfully sent to {user.phone}"
+    )
 
 
 async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
