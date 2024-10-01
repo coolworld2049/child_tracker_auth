@@ -1,4 +1,5 @@
 import enum
+import json
 import pathlib
 from pathlib import Path
 from tempfile import gettempdir
@@ -80,6 +81,12 @@ class Settings(BaseSettings):
             password=self.db_pass,
             path=f"/{self.db_base}",
         )
+
+    @property
+    def regions(self) -> list[dict[str, str]]:
+        data = pathlib.Path(__file__).parent.joinpath("data/regions.json")
+        regions = json.loads(data.read_bytes())
+        return regions
 
     model_config = SettingsConfigDict(
         env_file="../.env",

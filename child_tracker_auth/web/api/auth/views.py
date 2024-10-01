@@ -76,6 +76,7 @@ async def register(
         password_pbkdf_hash="",
         phone=user_credentials.phone,
         code=code,
+        region=user_credentials.region
     )
     try:
         db.add(new_user)
