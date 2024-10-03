@@ -16,7 +16,7 @@ from child_tracker_auth.db.base import (
     FileTable,
     SettingsTable,
     engine,
-    MediaTable,
+    MediaTable, MemberAccountsTable,
 )
 from child_tracker_auth.db.enums import get_enum_values
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
@@ -24,12 +24,15 @@ from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
 PydanticMember = sqlalchemy_to_pydantic(
     MemberTable, exclude=["password_pbkdf_hash", "password", "code", "token"]
 )
+PydanticMemberAccount = sqlalchemy_to_pydantic(MemberAccountsTable)
+
 PydanticDevice = sqlalchemy_to_pydantic(DeviceTable)
 PydanticLog = sqlalchemy_to_pydantic(LogTable)
 
 PydanticFile = sqlalchemy_to_pydantic(FileTable)
 PydanticMedia = sqlalchemy_to_pydantic(MediaTable)
 PydanticSettings = sqlalchemy_to_pydantic(SettingsTable)
+
 log_type_values = get_enum_values(
     engine=engine, table_name="logs", column_name="log_type"
 )
@@ -243,3 +246,7 @@ class PydanticFileRespone(PydanticFile):
 
 class PydanticMediaRespone(PydanticMedia):
     url: str
+
+
+class MemberAccount(PydanticMemberAccount):
+    pass
