@@ -11,13 +11,14 @@ engine = create_engine(
 meta = sa.MetaData()
 meta.reflect(
     engine,
-    only={"members", "devices", "logs", "files", "media", "settings"},
+    only={"members", "memberAccounts", "devices", "logs", "files", "media", "settings"},
 )
 
 Base = automap_base(metadata=meta)
 Base.prepare()
 
 MemberTable = Base.classes.members
+MemberAccountsTable = Base.classes.memberAccounts
 DeviceTable = Base.classes.devices
 LogTable = Base.classes.logs
 FileTable = Base.classes.files

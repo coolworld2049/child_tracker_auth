@@ -136,6 +136,7 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
     user_query = select(MemberTable).filter(MemberTable.phone == phone)
     user_result = await db.execute(user_query)
     user = user_result.scalars().first()
+    update_member_code = True
 
     if not user:
         raise HTTPException(
@@ -148,6 +149,7 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
         and code == settings.google_play_member_code
         and phone == settings.google_play_member_phone
     ):
+        update_member_code = False
         user.code = code
         logger.warning("Granted access to Google Play Service for a fake account")
 
@@ -167,7 +169,8 @@ async def auth_member_by_sms(code: int, phone: str, db: AsyncSession):
     )
 
     try:
-        user.code = None
+        if update_member_code:
+            user.code = None
         user.active = 1
         db.add(user)
         await db.commit()
