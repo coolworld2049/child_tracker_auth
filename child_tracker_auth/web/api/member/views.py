@@ -1,8 +1,5 @@
-from datetime import datetime
-
 from fastapi import APIRouter
 from fastapi.params import Depends
-from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
@@ -41,15 +38,15 @@ async def get_member_me_account(
     db: AsyncSession = Depends(get_db_session),
     current_member: schemas.PydanticMember = Depends(get_current_member),
 ):
-    q = select(MemberAccountsTable).where(
-        MemberAccountsTable.member_id == current_member.id)
+    q = (
+        select(MemberAccountsTable)
+        .where(MemberAccountsTable.member_id == current_member.id)
+        .order_by(MemberAccountsTable.start_date.desc())
+        .limit(1)
+    )
     r = await db.execute(q)
     rq = r.scalars().first()
     if not rq:
         return HTTPException(status_code=404)
     account = schemas.MemberAccount(**rq.__dict__)
-
-    if account.account_id == 1:
-        account.end_date = None
-
     return account

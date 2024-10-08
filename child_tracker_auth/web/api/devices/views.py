@@ -221,7 +221,7 @@ limit :limit OFFSET :offset
 @router.get(
     "/{id}/stat",
     response_model=dict[str, list[schemas.DeviceUsage]]
-                   | schemas.DeviceInternetActivity,
+    | schemas.DeviceInternetActivity,
     description="`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated",
 )
 async def get_device_statistics(
@@ -408,8 +408,8 @@ async def get_device_messages(
                         [
                             x["avatar_url"]
                             for x in filter(
-                            lambda c: c["id"] == vv["device_id"], devices_avatar
-                        )
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
                         ]
                     )
                 ),
@@ -471,8 +471,8 @@ async def get_conversation(
                         [
                             x["avatar_url"]
                             for x in filter(
-                            lambda c: c["id"] == vv["device_id"], devices_avatar
-                        )
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
                         ]
                     )
                 ),
