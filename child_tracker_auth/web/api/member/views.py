@@ -41,7 +41,7 @@ async def get_member_me_account(
     q = (
         select(MemberAccountsTable)
         .where(MemberAccountsTable.member_id == current_member.id)
-        .order_by(MemberAccountsTable.id.desc())
+        .order_by(MemberAccountsTable.id.asc())
         .limit(1)
     )
     r = await db.execute(q)
