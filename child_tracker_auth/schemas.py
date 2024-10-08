@@ -16,7 +16,8 @@ from child_tracker_auth.db.base import (
     FileTable,
     SettingsTable,
     engine,
-    MediaTable, MemberAccountsTable,
+    MediaTable,
+    MemberAccountsTable,
 )
 from child_tracker_auth.db.enums import get_enum_values
 from child_tracker_auth.utils.sa_to_pydantic import sqlalchemy_to_pydantic
