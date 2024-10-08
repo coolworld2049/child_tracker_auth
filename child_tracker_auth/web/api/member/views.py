@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from fastapi import APIRouter
 from fastapi.params import Depends
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
@@ -45,4 +48,8 @@ async def get_member_me_account(
     if not rq:
         return HTTPException(status_code=404)
     account = schemas.MemberAccount(**rq.__dict__)
+
+    if account.account_id == 1:
+        account.end_date = None
+
     return account
