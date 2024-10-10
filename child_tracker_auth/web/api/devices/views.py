@@ -142,7 +142,15 @@ async def get_device_phone_book(
               r]
     phone_book = [schemas.PhoneBookItem(name=x.sub or x.name, phone=x.phone) for x in
                   phones]
-    return phone_book
+    unique_phone_book = list({item.phone: item for item in phone_book}.values())
+
+    unique_phone_numbers = set()
+    unique_phone_book = []
+    for item in phone_book:
+        if item.phone not in unique_phone_numbers:
+            unique_phone_numbers.add(item.phone)
+            unique_phone_book.append(item)
+    return unique_phone_book
 
 
 @router.get(
