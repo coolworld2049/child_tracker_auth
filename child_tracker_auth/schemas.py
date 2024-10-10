@@ -149,18 +149,24 @@ class Phone(BaseModel):
     @property
     def phone(self) -> str:
         d = ","
-        spl = self.name.split(d)
+        name = self.name.replace("  ", " ")
+        spl = name.split()
         if len(spl) < 1:
             if not spl[0].replace("+", "").isnumeric():
                 return None
-            return self.name
-        return spl[0].strip()
+            return name
+        return spl[0].strip().replace(",", "")
 
     @computed_field
     @property
     def sub(self) -> str:
-        d = ","
-        spl = self.name.split(d)
+        d = None
+        name = self.name.replace("  ", " ")
+        if "," in name:
+            d = ","
+        elif " " in name:
+            d = " "
+        spl = name.split(d)
         if len(spl) < 2:
             return None
         return spl[1].strip()

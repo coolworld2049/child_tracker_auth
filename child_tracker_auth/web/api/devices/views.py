@@ -1,4 +1,3 @@
-import collections
 import json
 from contextlib import suppress
 from datetime import date
@@ -108,8 +107,7 @@ async def get_device_files(
 
 @router.get(
     "/{id}/phone_book",
-    response_model=dict[str, list[schemas.PhoneBookItem]],
-    description="dict key - uppercase alphabetic letter",
+    response_model=list[schemas.PhoneBookItem],
 )
 async def get_device_phone_book(
     id: int,
@@ -123,12 +121,7 @@ async def get_device_phone_book(
         l.name as name
     from
         logs l
-    join devices d on
-        d.id = l.device_id
-    where
-        d.id = :device_id
-        and l.log_type in ('in_call', 'out_call', 'out_sms')
-    group by l.name
+    where l.log_type in ('in_call', 'out_call', 'out_sms')
     limit :limit offset :offset
     """
     )
@@ -140,29 +133,15 @@ async def get_device_phone_book(
             "device_id": id,
         },
     )
-    r = rq.mappings().all()
-    df = pd.DataFrame(r)
+    r = rq.scalars().all()
 
-    if len(df) < 1:
-        return {"": []}
+    if len(r) < 1:
+        return []
 
-    def process_raw_name(s: pd.Series):
-        """
-        :returns: dict[name, phone]
-        """
-        return {
-            str(x.split(" ")[1]): x.split(" ")[0] for x in s if len(x.split(" ")) == 2
-        }
-
-    name_phone_dict: dict = df.apply(process_raw_name).tolist()[0]
-    phone_book_dict: dict[str, list[schemas.PhoneBookItem]] = collections.defaultdict(
-        list
-    )
-    for name, phone in name_phone_dict.items():
-        key = name[0].lower()
-        phone_book_dict[key].append(schemas.PhoneBookItem(name=name, phone=phone))
-
-    phone_book = dict(sorted(phone_book_dict.items(), key=lambda c: c[0]))
+    phones = [schemas.Phone(name=x) for x in
+              r]
+    phone_book = [schemas.PhoneBookItem(name=x.sub or x.name, phone=x.phone) for x in
+                  phones]
     return phone_book
 
 
@@ -221,7 +200,7 @@ limit :limit OFFSET :offset
 @router.get(
     "/{id}/stat",
     response_model=dict[str, list[schemas.DeviceUsage]]
-    | schemas.DeviceInternetActivity,
+                   | schemas.DeviceInternetActivity,
     description="`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated",
 )
 async def get_device_statistics(
@@ -408,8 +387,8 @@ async def get_device_messages(
                         [
                             x["avatar_url"]
                             for x in filter(
-                                lambda c: c["id"] == vv["device_id"], devices_avatar
-                            )
+                            lambda c: c["id"] == vv["device_id"], devices_avatar
+                        )
                         ]
                     )
                 ),
@@ -471,8 +450,8 @@ async def get_conversation(
                         [
                             x["avatar_url"]
                             for x in filter(
-                                lambda c: c["id"] == vv["device_id"], devices_avatar
-                            )
+                            lambda c: c["id"] == vv["device_id"], devices_avatar
+                        )
                         ]
                     )
                 ),
