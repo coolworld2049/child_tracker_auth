@@ -26,7 +26,12 @@ services:
     restart: always
     environment:
       - REDIS_ARGS="--requirepass ${CHILD_TRACKER_AUTH_REDIS_PASSWORD}"
+    volumes:
+      - redis_data:/data
     network_mode: host
     dns:
       - 8.8.8.8
       - 8.8.4.4
+
+volumes:
+  redis_data:
