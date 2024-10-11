@@ -90,6 +90,16 @@ class Settings(BaseSettings):
             path=f"/{self.db_base}",
         )
 
+    def redis_url(self, db: int = 0) -> URL:
+        return URL.build(
+            scheme="redis",
+            host=self.redis_host,
+            port=self.redis_port,
+            user=self.redis_user,
+            password=self.redis_password,
+            path=f"/{db}",
+        )
+
     @property
     def regions(self) -> list[dict[str, str]]:
         data = pathlib.Path(__file__).parent.joinpath("data/regions.json")
@@ -105,8 +115,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-Gb = 1073741824
-cache.setup(
-    f"disk://?directory={settings.diskcache_directory}", size_limit=3 * Gb, shards=12
-)
+cache.setup(settings.redis_url(db=settings.redis_cache_db).__str__())

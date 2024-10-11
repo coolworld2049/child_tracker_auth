@@ -11,13 +11,7 @@ from child_tracker_auth.storage.dependencies import (
     on_shutdown_storage,
 )
 
-redis_client = Redis(
-    host=settings.redis_host,
-    port=settings.redis_port,
-    username=settings.redis_user,
-    password=settings.redis_password,
-    db=settings.redis_websocket_db,
-)
+redis_client = Redis.from_url(settings.redis_url(db=settings.redis_websocket_db).__str__())
 
 
 def create_session_factory():
