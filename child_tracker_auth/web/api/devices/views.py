@@ -121,7 +121,7 @@ async def get_device_phone_book(
         l.name as name
     from
         logs l
-    where l.log_type in ('in_call', 'out_call', 'out_sms')
+    where l.log_type in ('in_call', 'out_call', 'out_sms') and device_id = :device_id
     limit :limit offset :offset
     """
     )
