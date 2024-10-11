@@ -257,3 +257,8 @@ class PydanticMediaRespone(PydanticMedia):
 
 class MemberAccount(PydanticMemberAccount):
     pass
+
+
+class GeolocationMessage(BaseModel):
+    latitude: float = Field(..., description="Latitude of the device")
+    longitude: float = Field(..., description="Longitude of the device")

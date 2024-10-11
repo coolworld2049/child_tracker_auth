@@ -2,50 +2,51 @@ version: "3.9"
 
 services:
   api:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    image: child_tracker_auth:${CHILD_TRACKER_AUTH_VERSION:-latest}
+    image: child_tracker_auth:latest
+    build: .
     restart: always
     env_file:
       - .env
+    environment:
+      CHILD_TRACKER_AUTH_HOST: 0.0.0.0
+      CHILD_TRACKER_AUTH_DB_HOST: db
+      CHILD_TRACKER_AUTH_REDIS_HOST: redis
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - ./public/files:/app/src/public/files
       - /tmp/child_tracker_auth_cache:/tmp/child_tracker_auth_cache
-    environment:
-      CHILD_TRACKER_AUTH_HOST: 0.0.0.0
-      CHILD_TRACKER_AUTH_DB_HOST: child_tracker_auth-db
     ports:
       - "8000:8000"
-  db:
-    image: docker.io/bitnami/mariadb:10.5.15
-    hostname: child_tracker_auth-db
-    restart: unless-stopped
+
+  redis:
+    image: redis/redis-stack:latest
+    restart: always
     environment:
-      MARIADB_ROOT_USER: ${MARIADB_ROOT_USER}
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
-      MARIADB_USER: ${CHILD_TRACKER_AUTH_DB_USER}
-      MARIADB_PASSWORD: ${CHILD_TRACKER_AUTH_DB_PASS}
+      - REDIS_ARGS="--requirepass ${CHILD_TRACKER_AUTH_REDIS_PASSWORD}"
+    ports:
+      - "8001:8001"
+      - "6379:6379"
+
+  db:
+    image: bitnami/mariadb:latest
+    restart: on-failure
+    healthcheck:
+      test: [ 'CMD', '/opt/bitnami/scripts/mariadb/healthcheck.sh' ]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    environment:
+      MARIADB_ROOT_USER: ${CHILD_TRACKER_AUTH_DB_USER}
+      MARIADB_ROOT_PASSWORD: ${CHILD_TRACKER_AUTH_DB_PASS}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
       MARIADB_DATABASE: ${CHILD_TRACKER_AUTH_DB_BASE}
       ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
       - ./scripts/initdb:/docker-entrypoint-initdb.d/
-      - child_tracker_auth-db-data:/bitnami/mariadb
     ports:
-      - '3306:3306'
-    healthcheck:
-      test:
-        - CMD
-        - mysqladmin
-        - ping
-        - --user=child_tracker_auth
-        - --password=child_tracker_auth
-      interval: 10s
-      timeout: 5s
-      retries: 40
-volumes:
-  child_tracker_auth-db-data:
-    name: child_tracker_auth-db-data
+      - "3306:3306"
