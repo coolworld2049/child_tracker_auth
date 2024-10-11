@@ -25,7 +25,7 @@ services:
     image: redis/redis-stack-server:latest
     restart: always
     environment:
-      - REDIS_ARGS="--requirepass ${REDIS_PASSWORD}"
+      - REDIS_ARGS="--requirepass ${CHILD_TRACKER_AUTH_REDIS_PASSWORD}"
     network_mode: host
     dns:
       - 8.8.8.8
