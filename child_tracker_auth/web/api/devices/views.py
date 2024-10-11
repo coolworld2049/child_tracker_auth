@@ -138,10 +138,10 @@ async def get_device_phone_book(
     if len(r) < 1:
         return []
 
-    phones = [schemas.Phone(name=x) for x in
-              r]
-    phone_book = [schemas.PhoneBookItem(name=x.sub or x.name, phone=x.phone) for x in
-                  phones]
+    phones = [schemas.Phone(name=x) for x in r]
+    phone_book = [
+        schemas.PhoneBookItem(name=x.sub or x.name, phone=x.phone) for x in phones
+    ]
     unique_phone_book = list({item.phone: item for item in phone_book}.values())
 
     unique_phone_numbers = set()
@@ -208,7 +208,7 @@ limit :limit OFFSET :offset
 @router.get(
     "/{id}/stat",
     response_model=dict[str, list[schemas.DeviceUsage]]
-                   | schemas.DeviceInternetActivity,
+    | schemas.DeviceInternetActivity,
     description="`DeviceUsageAggregatedData.limit`, `DeviceUsageAggregatedData.today_exp` - random generated",
 )
 async def get_device_statistics(
@@ -395,8 +395,8 @@ async def get_device_messages(
                         [
                             x["avatar_url"]
                             for x in filter(
-                            lambda c: c["id"] == vv["device_id"], devices_avatar
-                        )
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
                         ]
                     )
                 ),
@@ -458,8 +458,8 @@ async def get_conversation(
                         [
                             x["avatar_url"]
                             for x in filter(
-                            lambda c: c["id"] == vv["device_id"], devices_avatar
-                        )
+                                lambda c: c["id"] == vv["device_id"], devices_avatar
+                            )
                         ]
                     )
                 ),

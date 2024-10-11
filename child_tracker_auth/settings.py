@@ -66,10 +66,18 @@ class Settings(BaseSettings):
     tz: str
 
     google_play_member_name: str = "dujEHaPLYzpnhkQDSKPe3tE7K8G6cgAN"
-    google_play_member_phone: str = "+19999999999"
+    google_play_member_phone: str = "+998999999999"
     google_play_member_code: int = 4985
 
     diskcache_directory: str = "/tmp/child_tracker_auth_cache"
+
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_user: str = "default"
+    redis_password: str
+
+    redis_cache_db: int = 0
+    redis_websocket_db: int = 1
 
     @property
     def db_url(self) -> URL:
