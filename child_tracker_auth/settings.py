@@ -78,6 +78,7 @@ class Settings(BaseSettings):
 
     redis_cache_db: int = 0
     redis_websocket_db: int = 1
+    websocket_secret_key: str = "set_secret_key"
 
     @property
     def db_url(self) -> URL:

@@ -1,20 +1,16 @@
 import asyncio
 import json
 from contextlib import suppress
-from typing import Annotated
 
-from fastapi import WebSocketDisconnect, WebSocketException, APIRouter
-from fastapi.params import Query
+from fastapi import WebSocketDisconnect, APIRouter
 from loguru import logger
 from pydantic import ValidationError
 from redis.asyncio import Redis
-from sqlalchemy import select, and_
 from starlette import status
 from starlette.websockets import WebSocket
 
 from child_tracker_auth import schemas
-from child_tracker_auth.db.base import DeviceTable
-from child_tracker_auth.security.oauth2 import verify_access_token
+from child_tracker_auth.settings import settings
 from child_tracker_auth.web.lifespan import create_session_factory, redis_client
 
 
@@ -44,32 +40,29 @@ class WebsocketConnectionManager:
 
 websocket_connection_manager = WebsocketConnectionManager(redis_client)
 
-router = APIRouter()
+router = APIRouter(prefix=f"/{settings.websocket_secret_key}")
 engine, session_factory = create_session_factory()
 
 
-@router.websocket("/parent/children_device/{device_id}/geo/")
+@router.websocket("/parent/children_device/{dsn}/geo/")
 async def parent_websocket_endpoint(
     websocket: WebSocket,
-    access_token: Annotated[str, Query(...)],
-    device_id: str
+    dsn: str
 ):
-    credentials_exception = WebSocketException(
-        code=status.WS_1008_POLICY_VIOLATION,
-        reason="Could not validate credentials",
-    )
-    parent_member = verify_access_token(access_token, credentials_exception)
-
-    await websocket.accept()
+    """
+    device_dsn: [].dsn из из тела ответа эндпоинта GET /api/members/me/devices
+    """
+    key = f"device_dsn:{dsn}"
 
     try:
+        await websocket.accept()
+
         pubsub = redis_client.pubsub()
 
-        key = f"device_id:{device_id}:member_id:{parent_member.user_id}"
-
         await pubsub.subscribe(key)
+
         async for message in pubsub.listen():
-            logger.debug(message)
+            logger.debug(f"channel: {bytes(message['channel']).decode()} data: {bytes(message['data']).decode()}")
             with suppress(TypeError):
                 if message:
                     data = message['data']
@@ -84,46 +77,36 @@ async def parent_websocket_endpoint(
         logger.info("WebSocket disconnected")
 
 
-@router.websocket("/children/device/{device_id}/geo")
-async def children_websocket_endpoint(websocket: WebSocket, device_id: str):
-    async with session_factory() as db:
-        q = select(DeviceTable).where(
-            and_(
-                DeviceTable.id == int(device_id),
-            )
-        )
-        rq = await db.execute(q)
-        device_obj = rq.scalars().first()
-        if not device_obj:
-            await websocket.close(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="No authorized devices found",
-            )
-            return
+@router.websocket("/children/device/{dsn}/geo/")
+async def children_websocket_endpoint(websocket: WebSocket, dsn: str):
+    """
+    device_dsn: [].dsn из из тела ответа эндпоинта GET /api/members/me/devices
+    """
 
-    await websocket_connection_manager.connect(websocket, device_obj.id)
+    channel = f"device_dsn:{dsn}"
 
     try:
+        await websocket_connection_manager.connect(websocket, dsn)
+
         while True:
-            data = await websocket.receive_text()
             try:
+                data = await websocket.receive_text()
                 geolocation_message = schemas.GeolocationMessage.model_validate_json(
                     data
                 )
 
-                key = f"device_id:{device_obj.id}:member_id:{device_obj.member_id}"
-
+                logger.debug(f"channel: {channel} data: {data}")
                 await redis_client.publish(
-                    key,
+                    channel,
                     geolocation_message.model_dump_json(),
                 )
 
                 await redis_client.geoadd(
-                    key,
+                    channel,
                     values=[
                         geolocation_message.longitude,
                         geolocation_message.latitude,
-                        device_id,
+                        dsn,
                     ],
                 )
             except (ValueError, TypeError, AssertionError, ValidationError) as e:
@@ -138,4 +121,4 @@ async def children_websocket_endpoint(websocket: WebSocket, device_id: str):
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
     finally:
-        await websocket_connection_manager.disconnect(device_obj.id)
+        await websocket_connection_manager.disconnect(dsn)
