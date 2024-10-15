@@ -109,6 +109,7 @@ async def children_websocket_endpoint(websocket: WebSocket, dsn: str):
                         dsn,
                     ],
                 )
+                await asyncio.sleep(0.1)
             except (ValueError, TypeError, AssertionError, ValidationError) as e:
                 logger.error(f"Validation error: {e}")
                 await websocket.send_text(json.dumps({"error": str(e)}))
