@@ -260,5 +260,7 @@ class MemberAccount(PydanticMemberAccount):
 
 
 class GeolocationMessage(BaseModel):
-    latitude: float = Field(..., description="Latitude of the device")
-    longitude: float = Field(..., description="Longitude of the device")
+    device_id: str
+    device_date: str
+    latitude: float
+    longitude: float
