@@ -11,7 +11,9 @@ from child_tracker_auth.storage.dependencies import (
     on_shutdown_storage,
 )
 
-redis_client = Redis.from_url(settings.redis_url(db=settings.redis_websocket_db).__str__())
+ws_redis_client = Redis.from_url(
+    settings.redis_url(db=settings.redis_websocket_db).__str__()
+)
 
 
 def create_session_factory():
@@ -36,7 +38,8 @@ async def lifespan_setup(
     app.middleware_stack = None
     _setup_db(app)
     await on_startup_storage(app=app)
-    await redis_client.ping()
+    await ws_redis_client.ping()
+    app.state.ws_redis_client = ws_redis_client
 
     app.middleware_stack = app.build_middleware_stack()
 
@@ -44,3 +47,4 @@ async def lifespan_setup(
 
     await app.state.db_engine.dispose()
     await on_shutdown_storage(app)
+    await app.state.ws_redis_client.close()
