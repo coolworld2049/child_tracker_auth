@@ -261,6 +261,6 @@ class MemberAccount(PydanticMemberAccount):
 
 class GeolocationMessage(BaseModel):
     device_id: str
-    device_date: datetime
+    device_date: str
     latitude: float
     longitude: float
