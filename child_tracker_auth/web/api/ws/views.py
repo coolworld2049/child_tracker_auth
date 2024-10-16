@@ -1,6 +1,7 @@
 import asyncio
 import json
 from contextlib import suppress
+from datetime import datetime
 
 from cashews import cache
 from fastapi import WebSocketDisconnect, APIRouter
@@ -94,13 +95,14 @@ async def children_websocket_endpoint(websocket: WebSocket, dsn: str):
                     if distance >= MIN_DISTANCE_METERS:
                         device_id = await get_device_id(dsn)
                         if device_id:
+                            device_date = datetime.fromisoformat(geo_msg.device_date)
                             geo_logs_batch.append(
                                 LogTable(
                                     device_id=device_id,
                                     log_type="gps-point",
                                     name=",".join(map(str, current_position)),
-                                    date=geo_msg.device_date.date(),
-                                    time=geo_msg.device_date.time(),
+                                    date=device_date.date(),
+                                    time=device_date.time(),
                                 )
                             )
                             logger.info(f"Device {dsn} moved {distance:.2f} meters")
