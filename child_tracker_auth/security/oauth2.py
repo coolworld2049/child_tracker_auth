@@ -61,5 +61,7 @@ async def get_current_member(
     _user = user_result.scalars().first()
     if _user is None:
         raise credentials_exception
-    user = schemas.PydanticMember(**_user.__dict__)
+    user_dict = _user.__dict__
+    user_dict.pop("reset_until")
+    user = schemas.PydanticMember(**user_dict)
     return user

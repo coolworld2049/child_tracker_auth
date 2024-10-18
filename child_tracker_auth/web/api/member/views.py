@@ -47,6 +47,6 @@ async def get_member_me_account(
     r = await db.execute(q)
     rq = r.scalars().first()
     if not rq:
-        return HTTPException(status_code=404)
+        raise HTTPException(status_code=404)
     account = schemas.MemberAccount(**rq.__dict__)
     return account
